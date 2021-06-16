@@ -34,7 +34,8 @@ enum msgType_t
   msgType_dataRequest,
   msgType_linkChangeRequest,
   msgType_wakeRequest,
-  msgType_sleepRequest
+  msgType_sleepRequest,
+  NUM_msgTypes
 };
 
 enum spreadingFactor_t
@@ -44,20 +45,22 @@ enum spreadingFactor_t
   spreadingFactor_sf9,
   spreadingFactor_sf10,
   spreadingFactor_sf11,
-  spreadingFactor_sf12
+  spreadingFactor_sf12,
+  NUM_spreadingFactors
 };
 
-uint8_t signalBandwidthTable = [7, 8, 9, 10, 11, 12];
+uint8_t spreadingFactorTable [] = {7, 8, 9, 10, 11, 12};
 
 enum signalBandwidth_t
 {
   signalBandwidth_125kHz,
   signalBandwidth_250kHz,
   signalBandwidth_500kHz,
-  signalBandwidth_625kHz
+  signalBandwidth_625kHz,
+  NUM_signalBandwidths
 };
 
-uint32_t signalBandwidthTable = [125000, 250000, 500000, 625000];
+uint32_t signalBandwidthTable [] = {125000, 250000, 500000, 625000};
 
 enum frequencyChannel_t
 {
@@ -76,7 +79,8 @@ enum frequencyChannel_t
   frequencyChannel_500kHz_Downlink_4,
   frequencyChannel_500kHz_Downlink_5,
   frequencyChannel_500kHz_Downlink_6,
-  frequencyChannel_500kHz_Downlink_7
+  frequencyChannel_500kHz_Downlink_7,
+  NUM_frequencyChannels
 };
 
 uint16_t frequencyChannelTable [] = {9030, 9046, 9062, 9078, 9094, 9110, 9126, 9142, 9233, 9239, 9245, 9251, 9257, 9263, 9269, 9275};
@@ -104,8 +108,6 @@ uint8_t rxId;
 uint8_t rxFlags;
 msgType_t rxMsgType;
 
-spreadingFactor_t rf95 SpreadingFactor
-
 char inputChar = 0;
 
 //-----------------------
@@ -117,15 +119,12 @@ void setTxPower         (int8_t TxPower);
 void setSpreadingFactor (uint8_t spreadingFactor);
 void setBandwidth       (uint32_t bandwidth); 
 
-template <class dataPort_t, class debugPort_t>
-uint8_t buildStringFromSerial (dataPort_t* dataPort, debugPort_t* debugPort);
+template <class dataPort_t>
+uint8_t buildStringFromSerial (dataPort_t* dataPort);
 uint8_t buildStringFromSerialInner ();
 
-template <class debugPort_t>
-void serviceTx (debugPort_t* debugPort);
-
-template <class debugPort_t>
-void serviceRx (debugPort_t* debugPort);
+void serviceTx ();
+void serviceRx ();
 
 //------------
 // Main Setup
@@ -133,6 +132,8 @@ void serviceRx (debugPort_t* debugPort);
 
 void setup()
 {
+  digitalWrite(10, HIGH); // tie SD high
+  
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
   Serial.begin(USB_SERIAL_BAUD);
@@ -142,7 +143,7 @@ void setup()
   }
   delay(100);
   Serial.println("Feather LoRa Range Test - Base!");
-
+  
   forceRadioReset();
 
   while (!rf95.init())
@@ -173,11 +174,11 @@ void setup()
 
 void loop() {
   // Transmit a string!
-  if (buildStringFromSerial<Serial_, Serial_>(&Serial, &Serial))
+  if (buildStringFromSerial<Serial_>(&Serial))
   {
-    serviceTx<Serial_>(&Serial);
+    serviceTx();
   }
-  serviceRx<Serial_>(&Serial);
+  serviceRx();
 }
 
 //----------------------
@@ -194,37 +195,52 @@ void forceRadioReset ()
 
 void setSpreadingFactor (spreadingFactor_t spreadingFactor)
 {
-  
+  if (spreadingFactor >= NUM_spreadingFactors)
+  {
+    spreadingFactor = spreadingFactor_sf7;
+  }
+  uint8_t spreadingFactorToSet = spreadingFactorTable[spreadingFactor];
+  rf95.setSpreadingFactor(spreadingFactorToSet);
+  Serial.print("Set SF to: ");
+  Serial.println(spreadingFactorToSet);
 }
 
 void setBandwidth (signalBandwidth_t bandwidth)
 {
-  rf95.setSignalBandwidth(signalBandwidthTable[bandwidth]  )
+  if (bandwidth >= NUM_signalBandwidths)
+  {
+    bandwidth = signalBandwidth_125kHz;
+  }
+  uint32_t bandwidthToSet = signalBandwidthTable[bandwidth];
+  rf95.setSignalBandwidth(bandwidthToSet);
+  Serial.print("Set BW to: ");
+  Serial.println(bandwidthToSet);
 }
 
 void setFrequencyChannel (frequencyChannel_t frequencyChannel)
 {
-  if (frequencyChannel > 15)
+  if (frequencyChannel >= NUM_frequencyChannels)
   {
-    frequencyChannel = 0;
+    frequencyChannel = frequencyChannel_500kHz_Uplink_0;
   }
-  if (!rf95.setFrequency(((float)(frequencyChannelTable[frequencyChannel]))/10))
+  float frequencyToSet = ((float)(frequencyChannelTable[frequencyChannel]))/10;
+  if (!rf95.setFrequency(frequencyToSet))
   {
     Serial.println("setFrequency failed");
     while (1);
   }
   Serial.print("Set Freq to: ");
-  Serial.println(RFM95_DFLT_FREQ_MHz);
+  Serial.println(frequencyToSet);
 }
 
-template <class dataPort_t, class debugPort_t>
-uint8_t buildStringFromSerial (dataPort_t* dataPort, debugPort_t* debugPort)
+template <class dataPort_t>
+uint8_t buildStringFromSerial (dataPort_t* dataPort)
 {
   uint8_t retval;
   while (dataPort->available())
   {
     inputChar = dataPort->read();
-    debugPort->print(char(inputChar));
+    Serial.print(char(inputChar));
     retval = buildStringFromSerialInner();
   }
   return retval;
@@ -257,22 +273,21 @@ uint8_t buildStringFromSerialInner ()
   }
 }
 
-template <class debugPort_t>
-void serviceTx (debugPort_t* debugPort)
+void serviceTx ()
 {
   if (txBufIdx > 0)
   {
-    debugPort->print("Attempting to transmit: \"");
+    Serial.print("Attempting to transmit: \"");
     for (uint8_t i = 0; i < txBufIdx; i++)
     {
-      debugPort->print(char(txBuf[i]));
+      Serial.print(char(txBuf[i]));
     }
-    debugPort->println('\"');
+    Serial.println('\"');
     rf95.waitCAD();
     #if (USE_RH_RELIABLE_DATAGRAM > 0)
     if (rhReliableDatagram.sendtoWait(txBuf, txBufIdx, 0xEE) == true)
     {
-      debugPort->println("Sent successfully & acknowleged!");
+      Serial.println("Sent successfully & acknowleged!");
     }
     txBufIdx = 0;
     #else // USE_RH_RELIABLE_DATAGRAM
@@ -280,16 +295,15 @@ void serviceTx (debugPort_t* debugPort)
     txBufIdx = 0;
     rf95.waitPacketSent();
     #endif  // USE_RH_RELIABLE_DATAGRAM
-    debugPort->println("Sent successfully!");
+    Serial.println("Sent successfully!");
   }
   else
   {
-    debugPort->print("Nothing to transmit: TX buffer empty.");
+    Serial.print("Nothing to transmit: TX buffer empty.");
   }
 }
 
-template <class debugPort_t>
-void serviceRx (debugPort_t* debugPort)
+void serviceRx ()
 {
   if (
       #if (USE_RH_RELIABLE_DATAGRAM > 0)
@@ -305,16 +319,15 @@ void serviceRx (debugPort_t* debugPort)
       #endif  // USE_RH_RELIABLE_DATAGRAM
      )
   {
-    switch rxBuf[0]
+    switch (rxBuf[0])
     {
-      
       default:
-      debugPort->print("Received: \"");
+      Serial.print("Received: \"");
       for (uint8_t i = 0; i < rxBufLen; i++)
       {
-        debugPort->print(char(rxBuf[i]));
+        Serial.print(char(rxBuf[i]));
       }
-      debugPort->println("\"");
+      Serial.println("\"");
       rxBufLen = RH_RF95_MAX_MESSAGE_LEN;
       break;
     }

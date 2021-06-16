@@ -20,6 +20,8 @@ char inputChar = 0;
 
 void setup()
 {
+  digitalWrite(10, HIGH);
+  
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 

@@ -20,6 +20,8 @@ uint8_t inputChar = 0;
 
 void setup()
 {
+  digitalWrite(10, HIGH);
+  
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
@@ -72,9 +74,10 @@ void setup()
 
 void loop() {
   // Transmit a string!
-  if (Serial1.available())
+  if (Serial.available()) // (Serial1.available())
   {
-    inputChar = Serial1.read();
+    inputChar = Serial.read(); // Serial1.read();
+    Serial.print(char(inputChar));
     // Add chars to ignore to this.
     if ((inputChar != '\n'
          && inputChar != '\r')
@@ -105,7 +108,7 @@ void loop() {
     for (uint8_t i = 0; i < outputBufLen; i++)
     {
       Serial.print(char(outputBuf[i]));
-      Serial1.write(outputBuf[i]);
+      //Serial1.write(outputBuf[i]);
     }
     Serial.println('\"');
     outputBufLen = RH_RF95_MAX_MESSAGE_LEN;

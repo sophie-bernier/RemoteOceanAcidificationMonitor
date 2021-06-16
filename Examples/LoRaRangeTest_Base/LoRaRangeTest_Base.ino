@@ -1,6 +1,7 @@
 // Echoes serial communication over UART and vice versa.
 // Koichi approved.
 // Designed to work with the RFM95 Feather M0 board.
+// This is the client, with SD logging and an OLED display.
 
 #include <SPI.h>
 #include <RH_RF95.h>

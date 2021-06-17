@@ -13,7 +13,21 @@
 #define RFM95_INT 3
 #define RH_RELIABLE_DATAGRAM_ADDR 0xEE
 
-loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR, RFM95_CS, RFM95_INT);
+#define USB_SERIAL_BAUD 115200
+
+//--------------------------------
+// Callback function declarations
+//--------------------------------
+
+
+//---------
+// Classes
+//---------
+
+loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
+                            RFM95_CS,
+                            RFM95_INT,
+                            RFM95_RST);
 
 //------------
 // Main Setup
@@ -21,10 +35,16 @@ loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR, RFM95_CS, RFM95_INT);
 
 void setup()
 {
+  Serial.begin(USB_SERIAL_BAUD);
+  while (!Serial)
+  {
+    delay(1);
+  }
+  
   digitalWrite(10, HIGH); // tie SD high
   point2point.setupRadio();
 }
-
+ 
 //-----------
 // Main Loop
 //-----------
@@ -38,3 +58,7 @@ void loop()
   }
   point2point.serviceRx();
 }
+
+//-------------------------------
+// Callback function definitions
+//-------------------------------

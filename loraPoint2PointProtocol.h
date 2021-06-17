@@ -24,6 +24,16 @@
 // Message Type and Structure Declarations
 //-----------------------------------------
 
+struct message_t
+{
+  uint8_t srcAddr;
+  uint8_t destAddr;
+  uint8_t msgId;
+  uint8_t flags;
+  uint8_t bufLen;
+  uint8_t buf [RH_RF95_MAX_MESSAGE_LEN];
+};
+
 enum eventType_t
 {
   eventType_rf95Reset,
@@ -141,21 +151,8 @@ class loraPoint2Point
     // Private variables
     uint8_t rfm95Rst = 4;
     uint8_t thisAddress = 0;
-    uint8_t txBuf [RH_RF95_MAX_MESSAGE_LEN];
-    uint8_t txBufIdx = 0;
-    uint8_t txSrcAddr = 0;
-    uint8_t txDestAddr = 0;
-    uint8_t txId = 0;
-    uint8_t txFlags = 0;
-    msgType_t txMsgType = msgType_undefined;
-    uint8_t rxBuf [RH_RF95_MAX_MESSAGE_LEN];
-    uint8_t rxBufLen = RH_RF95_MAX_MESSAGE_LEN;
-    uint8_t rxSrcAddr = 0;
-    uint8_t rxDestAddr = 0;
-    uint8_t rxId = 0;
-    uint8_t rxFlags = 0;
-    uint8_t params;
-    msgType_t rxMsgType = msgType_undefined;
+    message_t txMsg = {0, 0, 0, 0, 0};
+    message_t rxMsg = {0, 0, 0, 0, 0};
     const uint8_t spreadingFactorTable [NUM_spreadingFactors] = {7, 8, 9, 10, 11, 12};
     const uint32_t signalBandwidthTable [NUM_signalBandwidths] = {125000, 250000, 500000, 625000};
     const uint16_t frequencyChannelTable [NUM_frequencyChannels] = {9030, 9046, 9062, 9078, 9094, 9110, 9126, 9142, 9233, 9239, 9245, 9251, 9257, 9263, 9269, 9275};

@@ -130,16 +130,16 @@ uint8_t loraPoint2Point::buildStringFromSerialInner (char inputChar)
   // Add chars to ignore to this.
   if ((inputChar != '\n'
        && inputChar != '\r')
-      && txBufIdx < RH_RF95_MAX_MESSAGE_LEN)
+      && txMsg.bufLen < RH_RF95_MAX_MESSAGE_LEN)
   {
-    txBuf[txBufIdx] = inputChar;
-    txBufIdx++;
+    txMsg.buf[txMsg.bufLen] = inputChar;
+    txMsg.bufLen++;
   }
   // Special start key
   if (inputChar == '$')
   {
-    txBuf[txBufIdx] = 27;
-    txBufIdx++;
+    txMsg.buf[txMsg.bufLen] = 27;
+    txMsg.bufLen++;
   }
   // \n triggers sending
   if (inputChar == '\n')
@@ -155,17 +155,17 @@ uint8_t loraPoint2Point::buildStringFromSerialInner (char inputChar)
 void loraPoint2Point::serviceTx (uint8_t destAddress)
 {
   bool acknowleged = false;
-  if (txBufIdx > 0)
+  if (txMsg.bufLen > 0)
   {
     Serial.print("Attempting to transmit: \"");
-    for (uint8_t i = 0; i < txBufIdx; i++)
+    for (uint8_t i = 0; i < txMsg.bufLen; i++)
     {
-      Serial.print(char(txBuf[i]));
+      Serial.print(char(txMsg.buf[i]));
     }
     Serial.println("\"");
     rf95.waitCAD();
     #if (USE_RH_RELIABLE_DATAGRAM > 0)
-    if (rhReliableDatagram.sendtoWait(txBuf, txBufIdx, destAddress) == true)
+    if (rhReliableDatagram.sendtoWait(txMsg.buf, txMsg.bufLen, destAddress) == true)
     {
       Serial.println("Acknowleged!");
       acknowleged = true;
@@ -174,10 +174,10 @@ void loraPoint2Point::serviceTx (uint8_t destAddress)
     {
       Serial.println("Not acknowleged.");
     }
-    txBufIdx = 0;
+    txMsg.bufLen = 0;
     #else // USE_RH_RELIABLE_DATAGRAM
-    rf95.send(txBuf, txBufIdx);
-    txBufIdx = 0;
+    rf95.send(txMsg.buf, txMsg.bufLen);
+    txMsg.bufLen = 0;
     rf95.waitPacketSent();
     Serial.println("Sent successfully!");
     #endif  // USE_RH_RELIABLE_DATAGRAM
@@ -192,28 +192,28 @@ void loraPoint2Point::serviceRx ()
 {
   if (
       #if (USE_RH_RELIABLE_DATAGRAM > 0)
-      rhReliableDatagram.recvfromAckTimeout(rxBuf,
-                                     &rxBufLen,
+      rhReliableDatagram.recvfromAckTimeout(rxMsg.buf,
+                                     &rxMsg.bufLen,
                                      500,
-                                     &rxSrcAddr,
-                                     &rxDestAddr,
-                                     &rxId,
-                                     &rxFlags)
+                                     &rxMsg.srcAddr,
+                                     &rxMsg.destAddr,
+                                     &rxMsg.msgId,
+                                     &rxMsg.flags)
       #else // USE_RH_RELIABLE_DATAGRAM
-      rf95.recv(rxBuf, &rxBufLen)
+      rf95.recv(rxMsg.buf, &(rxMsg.bufLen))
       #endif  // USE_RH_RELIABLE_DATAGRAM
      )
   {
-    switch (rxBuf[0])
+    switch (rxMsg.buf[0])
     {
       default:
       Serial.print("Received: \"");
-      for (uint8_t i = 0; i < rxBufLen; i++)
+      for (uint8_t i = 0; i < rxMsg.bufLen; i++)
       {
-        Serial.print(char(rxBuf[i]));
+        Serial.print(char(rxMsg.buf[i]));
       }
       Serial.println("\"");
-      rxBufLen = RH_RF95_MAX_MESSAGE_LEN;
+      rxMsg.bufLen = RH_RF95_MAX_MESSAGE_LEN;
       break;
     }
   }

@@ -20,8 +20,6 @@
 
 #define USE_RH_RELIABLE_DATAGRAM true
 
-#define DEBUG_DISABLE_LOG_FUNC false
-
 //-----------------------------------------
 // Message Type and Structure Declarations
 //-----------------------------------------
@@ -111,18 +109,14 @@ class loraPoint2Point
     loraPoint2Point (uint8_t _thisAddress,
                      uint8_t rfm95CS,
                      uint8_t rfm95Int,
-                     uint8_t rfm95Rst,
-                     uint8_t (*_logEvent)(eventType_t eventType,
-                                          eventStatus_t eventStatus_t,
-                                          String const & paramString)
+                     uint8_t rfm95Rst
                      ):
-                     thisAddress{_thisAddress},
-                     rf95(rfm95CS, rfm95Int),
-                     rhReliableDatagram(rf95, _thisAddress),
-                     logEvent{_logEvent}
-                     {
+                       thisAddress{_thisAddress},
+                       rf95(rfm95CS, rfm95Int),
+                       rhReliableDatagram(rf95, _thisAddress)
+                       {
                        
-                     }
+                       }
     
     // Public functions
     void setupRadio ();
@@ -145,7 +139,6 @@ class loraPoint2Point
     //goToSleep ();
   private:
     // Private variables
-    String eventParamStr = "";
     uint8_t rfm95Rst = 4;
     uint8_t thisAddress = 0;
     uint8_t txBuf [RH_RF95_MAX_MESSAGE_LEN];
@@ -178,7 +171,6 @@ class loraPoint2Point
     // Callback functions
     //uint8_t (*serviceMsgData)();
     //uint8_t (*serviceMsgLinkAdapt)();
-    uint8_t (*logEvent)(eventType_t eventType, eventStatus_t eventStatus_t, String const & paramString);
 };
 
 

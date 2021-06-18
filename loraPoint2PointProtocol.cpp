@@ -152,6 +152,14 @@ uint8_t loraPoint2Point::buildStringFromSerialInner (char inputChar)
   }
 }
 
+// Todo: smarter way of doing this.
+uint8_t loraPoint2Point::setTxMessage (uint8_t const * txMsgContents, uint8_t const numChars)
+{
+  memcpy(txMsg.buf, txMsgContents, numChars);
+  txMsg.bufLen = numChars;
+  return numChars;
+}
+
 void loraPoint2Point::serviceTx (uint8_t destAddress)
 {
   bool acknowleged = false;
@@ -174,13 +182,13 @@ void loraPoint2Point::serviceTx (uint8_t destAddress)
     {
       Serial.println("Not acknowleged.");
     }
-    txMsg.bufLen = 0;
     #else // USE_RH_RELIABLE_DATAGRAM
     rf95.send(txMsg.buf, txMsg.bufLen);
-    txMsg.bufLen = 0;
     rf95.waitPacketSent();
     Serial.println("Sent successfully!");
     #endif  // USE_RH_RELIABLE_DATAGRAM
+    user.txInd(txMsg.buf, txMsg.bufLen, destAddress, acknowleged);
+    txMsg.bufLen = 0;
   }
   else
   {
@@ -204,6 +212,7 @@ void loraPoint2Point::serviceRx ()
       #endif  // USE_RH_RELIABLE_DATAGRAM
      )
   {
+    user.rxInd(rxMsg);
     switch (rxMsg.buf[0])
     {
       default:

@@ -34,6 +34,15 @@ struct message_t
   uint8_t buf [RH_RF95_MAX_MESSAGE_LEN];
 };
 
+struct userCallbacks_t
+{
+  void (*txInd) (uint8_t const * txBuf, 
+                 uint8_t const bufLen, 
+                 uint8_t const destAddr, 
+                 bool ack);
+  void (*rxInd) (message_t const & rxMsg);
+};
+
 enum eventType_t
 {
   eventType_rf95Reset,
@@ -116,12 +125,14 @@ class loraPoint2Point
 {
   public:
     // Constructor
-    loraPoint2Point (uint8_t _thisAddress,
-                     uint8_t rfm95CS,
-                     uint8_t rfm95Int,
-                     uint8_t rfm95Rst
+    loraPoint2Point (uint8_t const _thisAddress,
+                     uint8_t const rfm95CS,
+                     uint8_t const rfm95Int,
+                     uint8_t const rfm95Rst,
+                     userCallbacks_t const & userCallbacks
                      ):
                        thisAddress{_thisAddress},
+                       user{userCallbacks},
                        rf95(rfm95CS, rfm95Int),
                        rhReliableDatagram(rf95, _thisAddress)
                        {
@@ -134,6 +145,8 @@ class loraPoint2Point
     void setSpreadingFactor  (spreadingFactor_t spreadingFactor);
     void setBandwidth        (signalBandwidth_t bandwidth); 
     void setTxPower          (int8_t txPower);
+    uint8_t setTxMessage          (uint8_t const * txMsgContents,
+                                   uint8_t const numChars);
     uint8_t buildStringFromSerial (Serial_* dataPort);
     uint8_t buildStringFromSerial (Uart* dataPort);
     void serviceTx (uint8_t destAddress);
@@ -166,8 +179,7 @@ class loraPoint2Point
     void forceRadioReset ();
     
     // Callback functions
-    //uint8_t (*serviceMsgData)();
-    //uint8_t (*serviceMsgLinkAdapt)();
+    userCallbacks_t user;
 };
 
 

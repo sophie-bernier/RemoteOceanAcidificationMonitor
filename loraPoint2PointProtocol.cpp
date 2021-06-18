@@ -7,7 +7,7 @@
 // Function Definitions
 //----------------------
 
-void loraPoint2Point::setupRadio ()
+bool loraPoint2Point::setupRadio ()
 {
   pinMode(rfm95Rst, OUTPUT);
   digitalWrite(rfm95Rst, HIGH);
@@ -19,7 +19,7 @@ void loraPoint2Point::setupRadio ()
   {
     Serial.println("LoRa radio init failed");
     Serial.println("Uncomment '#define SERIAL_DEBUG' in RH_RF95.cpp for detailed debug info");
-    while (1);
+    return false;
   }
   Serial.println("LoRa radio init OK!");
 
@@ -27,7 +27,7 @@ void loraPoint2Point::setupRadio ()
   while (!rhReliableDatagram.init())
   {
     Serial.println("Manager init failed");
-    while (1);
+    return false;
   }
   Serial.println("Manager init OK!");
   #endif // USE_RH_RELIABLE_DATAGRAM
@@ -35,6 +35,7 @@ void loraPoint2Point::setupRadio ()
   setSpreadingFactor(spreadingFactor_sf7);
   setBandwidth(signalBandwidth_500kHz);
   rf95.setTxPower(RFM95_DFLT_TX_POWER_dBm, false);
+  return true;
 }
 
 void loraPoint2Point::forceRadioReset ()
@@ -192,7 +193,7 @@ void loraPoint2Point::serviceTx (uint8_t destAddress)
   }
   else
   {
-    Serial.print("Nothing to transmit: TX buffer empty.");
+    Serial.println("Nothing to transmit: TX buffer empty.");
   }
 }
 

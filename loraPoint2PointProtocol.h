@@ -140,7 +140,7 @@ class loraPoint2Point
                        }
     
     // Public functions
-    void setupRadio ();
+    bool setupRadio ();
     void setFrequencyChannel (frequencyChannel_t frequencyChannel);
     void setSpreadingFactor  (spreadingFactor_t spreadingFactor);
     void setBandwidth        (signalBandwidth_t bandwidth); 

@@ -34,7 +34,8 @@ bool loraPoint2Point::setupRadio ()
 
   setSpreadingFactor(spreadingFactor_sf7);
   setBandwidth(signalBandwidth_500kHz);
-  rf95.setTxPower(RFM95_DFLT_TX_POWER_dBm, false);
+  setTxPower(RFM95_DFLT_TX_POWER_dBm);
+  setFrequencyChannel(frequencyChannel_500kHz_Uplink_0);
   return true;
 }
 

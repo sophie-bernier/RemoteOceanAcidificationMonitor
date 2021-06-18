@@ -165,7 +165,7 @@ class loraPoint2Point
     uint8_t rfm95Rst = 4;
     uint8_t thisAddress = 0;
     message_t txMsg = {0, 0, 0, 0, 0};
-    message_t rxMsg = {0, 0, 0, 0, 0};
+    message_t rxMsg = {0, 0, 0, 0, RH_RF95_MAX_MESSAGE_LEN};
     const uint8_t spreadingFactorTable [NUM_spreadingFactors] = {7, 8, 9, 10, 11, 12};
     const uint32_t signalBandwidthTable [NUM_signalBandwidths] = {125000, 250000, 500000, 625000};
     const uint16_t frequencyChannelTable [NUM_frequencyChannels] = {9030, 9046, 9062, 9078, 9094, 9110, 9126, 9142, 9233, 9239, 9245, 9251, 9257, 9263, 9269, 9275};

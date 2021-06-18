@@ -19,15 +19,25 @@
 // Callback function declarations
 //--------------------------------
 
+void txInd (uint8_t const * txBuf,
+            uint8_t const bufLen,
+            uint8_t const destAddr,
+            bool ack)
+{}
+void rxInd (message_t const & rxMsg)
+{}
 
 //---------
 // Classes
 //---------
 
+userCallbacks_t callbacks = {txInd, rxInd};
+
 loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
                             RFM95_CS,
                             RFM95_INT,
-                            RFM95_RST);
+                            RFM95_RST,
+                            callbacks);
 
 //------------
 // Main Setup
@@ -48,7 +58,7 @@ void setup()
 //-----------
 // Main Loop
 //-----------
-
+ 
 void loop()
 {
   // Transmit a string!

@@ -24,6 +24,17 @@
 
 #define USB_SERIAL_BAUD 115200
 
+#define DISPLAY_X        128
+#define DISPLAY_Y        32
+#define DISPLAY_CHAR_X   6
+#define DISPLAY_CHAR_Y   8
+#define DISPLAY_RX_START 65
+#define DISPLAY_TX_START 0
+#define DISPLAY_RX_LEN   DISPLAY_X - DISPLAY_RX_START
+#define DISPLAY_TX_LEN   60
+#define DISPLAY_RX_CHARS 10
+#define DISPLAY_TX_CHARS 10
+
 //--------------------------------
 // Callback function declarations
 //--------------------------------
@@ -63,30 +74,7 @@ void setup()
   }
   
   digitalWrite(10, HIGH); // tie SD high
-  point2point.setupRadio();
 
-  Serial.print("Initializing SD card...");
-  if (!SD.begin(SD_CS))
-  {
-    Serial.println("Card failed or not present");
-  }
-  else
-  {
-    Serial.println("Card initialized.");
-  }
-  
-  dataFile = SD.open(dataFileName, FILE_WRITE);
-  if (dataFile)
-  {
-    dataFile.println(dataFileHeader);
-    Serial.println("Header written to SD card.");
-  }
-  else
-  {
-    Serial.println("SD card write failed.");
-  }
-  dataFile.close();
-  
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
   {
     Serial.println("Display initialization failed.");
@@ -95,6 +83,78 @@ void setup()
   {
     Serial.println("Display initialized.");
   }
+  
+  display.display();
+  delay(1000);
+  display.clearDisplay();
+  display.display();
+  
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0,0);
+  
+  display.print("Radio:    ");
+  display.display();
+  if (!point2point.setupRadio())
+  {
+    display.println("failed");
+    display.display();
+    while(1);
+  }
+  else
+  {
+    display.println("OK");
+    display.display();
+  }
+
+  Serial.print("Initializing SD card...");
+  display.print("SD open:  ");
+  display.display();
+  if (!SD.begin(SD_CS))
+  {
+    Serial.println("Card failed or not present");
+    display.println("failed");
+    display.display();
+  }
+  else
+  {
+    Serial.println("Card initialized.");
+    display.println("OK");
+    display.display();
+  }
+
+  display.print("SD write: ");
+  display.display();
+  dataFile = SD.open(dataFileName, FILE_WRITE);
+  if (dataFile)
+  {
+    dataFile.println(dataFileHeader);
+    Serial.println("Header written to SD card.");
+    display.println("OK");
+    display.display();
+  }
+  else
+  {
+    Serial.println("SD card write failed.");
+    display.println("failed");
+    display.display();
+  }
+  dataFile.close();
+
+  display.println("Starting");
+  display.display();
+  delay(1000);
+  display.clearDisplay();
+  display.drawFastVLine(62,  0, 32, 1);
+  display.drawFastHLine(61,  0,  3, 1);
+  display.drawFastHLine(61, 31,  3, 1);
+  /* Test pattern, do not need.
+  display.fillRect( 0,  0, 16, 16, 1);
+  display.fillRect(16,  0, 16, 16, 0);
+  display.fillRect( 0  16, 16, 16, 0);
+  display.fillRect(16, 16, 16, 16, 1);
+  display.drawRect( 0,  0, 32, 32, 1);
+  */
   display.display();
 }
 
@@ -104,6 +164,7 @@ void setup()
 
 uint32_t prevMillis = 0;
 uint32_t currentMillis = 0;
+uint32_t lastAckMillis = 0;
 bool timeUp = false;
 
 void loop()
@@ -168,6 +229,32 @@ void txInd (uint8_t const * txBuf,
     Serial.println("SD card write failed.");
   }
   dataFile.close();
+  display.fillRect(DISPLAY_TX_START, 0, DISPLAY_TX_LEN, DISPLAY_Y, 0);
+  display.setCursor(DISPLAY_TX_START, 0);
+  display.print("To ");
+  display.print(destAddr, HEX);
+  display.print("h ");
+  if (ack == true)
+  {
+    lastAckMillis = currentMillis;
+    display.print("ACK");
+  }
+  else
+  {
+    display.print("NAK");
+  }
+  display.setCursor(DISPLAY_TX_START, DISPLAY_CHAR_Y);
+  for (uint8_t i = 0; (i < bufLen) && (i < DISPLAY_RX_CHARS); i++)
+  {
+    display.print(char(txBuf[i]));
+  }
+  display.setCursor(DISPLAY_TX_START, DISPLAY_CHAR_Y*2);
+  display.print("TX:");
+  display.print(currentMillis/1000);
+  display.setCursor(DISPLAY_TX_START, DISPLAY_CHAR_Y*3);
+  display.print("A.:");
+  display.print(lastAckMillis/1000);
+  display.display();
 }
 
 void rxInd (message_t const & rxMsg)
@@ -197,4 +284,18 @@ void rxInd (message_t const & rxMsg)
     Serial.println("SD card write failed.");
   }
   dataFile.close();
+  display.fillRect(DISPLAY_RX_START, 0, DISPLAY_RX_LEN, DISPLAY_Y, 0);
+  display.setCursor(DISPLAY_RX_START, 0);
+  display.print("From ");
+  display.print(rxMsg.srcAddr, HEX);
+  display.print("h");
+  display.setCursor(DISPLAY_RX_START, DISPLAY_CHAR_Y);
+  for (uint8_t i = 0; (i < rxMsg.bufLen) && (i < DISPLAY_RX_CHARS); i++)
+  {
+    display.print(char(rxMsg.buf[i]));
+  }
+  display.setCursor(DISPLAY_RX_START, DISPLAY_CHAR_Y*2);
+  display.print("RX:");
+  display.print(currentMillis/1000);
+  display.display();
 }

@@ -3,6 +3,8 @@
 #ifndef LORA_POINT_2_POINT_PROTOCOL_H
 #define LORA_POINT_2_POINT_PROTOCOL_H
 #include <Arduino.h>
+//#include <list.h>
+#include <simpleTimer.h>
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <RHReliableDatagram.h>
@@ -10,13 +12,13 @@
 // The default transmitter power is 13dBm, using PA_BOOST.
 // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
 // you can set transmitter powers from 5 to 23 dBm:
-#define RFM95_DFLT_FREQ_MHz     902.5
-#define RFM95_DFLT_SF           7
-#define RFM95_DFLT_TX_POWER_dBm 15
-#define RFM95_DFLT_BW_Hz        500000
-
+#define RFM95_DFLT_FREQ_CHANNEL     frequencyChannel_500kHz_Uplink_0
+#define RFM95_DFLT_SPREADING_FACTOR spreadingFactor_sf7
+#define RFM95_DFLT_TX_POWER_dBm     15
+#define RFM95_DFLT_SIGNAL_BANDWIDTH signalBandwidth_500kHz
 #define RH_RF95_MAX_MESSAGE_LEN 128
-#define DEBUG_STR_LEN           (sizeof(double)*8+1)
+
+#define LINK_CHANGE_TIMEOUT_MILLIS 5000
 
 #define USE_RH_RELIABLE_DATAGRAM true
 
@@ -70,7 +72,9 @@ enum msgType_t
 {
   msgType_undefined,
   msgType_dataRequest,
-  msgType_linkChangeRequest,
+  msgType_dataRsp,
+  msgType_linkChangeReq,
+  msgType_linkChangeRsp,
   msgType_wakeRequest,
   msgType_sleepRequest,
   NUM_msgTypes
@@ -136,7 +140,7 @@ class loraPoint2Point
                        rf95(rfm95CS, rfm95Int),
                        rhReliableDatagram(rf95, _thisAddress)
                        {
-                       
+
                        }
     
     // Public functions
@@ -151,6 +155,21 @@ class loraPoint2Point
     uint8_t buildStringFromSerial (Uart* dataPort);
     void serviceTx (uint8_t destAddress);
     void serviceRx ();
+    /**
+     * Client       Server   Client            Server
+     * (Base)      (Sensor)  (Base)           (Sensor)
+     *  |                |    |                     |
+     *  |--Request(Req)->|    |<-Indication(Ind)----|
+     *  |<-Response(Rsp)-|    |--Confirmation(Cnf)->|
+     *  V                V    V                     V
+     */
+    void dataReq        (); // Client only
+    void linkChangeReq  (uint8_t const            destAddress,
+                         spreadingFactor_t const  spreadingFactor,
+                         signalBandwidth_t const  signalBandwidth,
+                         frequencyChannel_t const frequencyChannel,
+                         int8_t const             txPower);
+    void serviceTimers (); // Call this regularly in the main loop
     
     //sendLinkChangeRequest (uint8_t destAddr;
     //                       spreadingFactor_t spreadingFactor,
@@ -164,19 +183,42 @@ class loraPoint2Point
     // Private variables
     uint8_t rfm95Rst = 4;
     uint8_t thisAddress = 0;
+    spreadingFactor_t  currentSpreadingFactor  = RFM95_DFLT_SPREADING_FACTOR;
+    signalBandwidth_t  currentSignalBandwidth  = RFM95_DFLT_SIGNAL_BANDWIDTH;
+    frequencyChannel_t currentFrequencyChannel = RFM95_DFLT_FREQ_CHANNEL;
+    int8_t             currentTxPower          = RFM95_DFLT_TX_POWER_dBm;
+    spreadingFactor_t  previousSpreadingFactor  = currentSpreadingFactor;
+    signalBandwidth_t  previousSignalBandwidth  = currentSignalBandwidth;
+    frequencyChannel_t previousFrequencyChannel = currentFrequencyChannel;
+    int8_t             previousTxPower          = currentTxPower;
     message_t txMsg = {0, 0, 0, 0, 0};
     message_t rxMsg = {0, 0, 0, 0, RH_RF95_MAX_MESSAGE_LEN};
     const uint8_t spreadingFactorTable [NUM_spreadingFactors] = {7, 8, 9, 10, 11, 12};
     const uint32_t signalBandwidthTable [NUM_signalBandwidths] = {125000, 250000, 500000, 625000};
     const uint16_t frequencyChannelTable [NUM_frequencyChannels] = {9030, 9046, 9062, 9078, 9094, 9110, 9126, 9142, 9233, 9239, 9245, 9251, 9257, 9263, 9269, 9275};
+    uint32_t currentMillis = 0;
     
     // Private classes
     RH_RF95 rf95;
     RHReliableDatagram rhReliableDatagram;
+    simpleTimer linkChangeTimeoutTimer = simpleTimer(LINK_CHANGE_TIMEOUT_MILLIS,
+                                                     currentMillis,
+                                                     false);
+    //list<simpleTimer*> simpleTimerList;
     
     // Private functions
     uint8_t buildStringFromSerialInner (char inputChar);
     void forceRadioReset ();
+    void serviceDataReq (); // Server only
+    void serviceDataRsp (); // Client only
+    void serviceLinkChangeReq (uint8_t const            srcAddress,
+                               spreadingFactor_t const  spreadingFactor,
+                               signalBandwidth_t const  signalBandwidth,
+                               frequencyChannel_t const frequencyChannel,
+                               int8_t const             txPower);
+    void serviceLinkChangeRsp ();
+    void linkChangeReqTimeout ();
+
     
     // Callback functions
     userCallbacks_t user;

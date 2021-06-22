@@ -2,8 +2,6 @@
 
 #include <Arduino.h>
 
-// test
-
 class simpleTimer
 {
   public:

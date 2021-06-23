@@ -4,128 +4,65 @@
 // This is the client, with SD logging and an OLED display.
 
 #include <SPI.h>
+#include <Wire.h>
+#include <SD.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <RH_RF95.h>
 #include <RHReliableDatagram.h>
+#include <loraPoint2PointProtocol.h>
 
-#define USB_SERIAL_BAUD  115200
+#define BUTTON_A 9
+#define BUTTON_B 6
+#define BUTTON_C 5
+#define BUTTON_SETTING_SELECT BUTTON_A
+#define BUTTON_VALUE_SELECT   BUTTON_B
+#define BUTTON_ENTER          BUTTON_C
 
+#define SD_CS     10
 #define RFM95_CS  8
 #define RFM95_RST 4
 #define RFM95_INT 3
-
-// The default transmitter power is 13dBm, using PA_BOOST.
-// If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
-// you can set transmitter powers from 5 to 23 dBm:
-#define RFM95_DFLT_FREQ_MHz     902.5
-#define RFM95_DFLT_SF           7
-#define RFM95_DFLT_TX_POWER_dBm 15
-#define RFM95_DFLT_BW_Hz        500000
-
-#define RH_RF95_MAX_MESSAGE_LEN 128
 #define RH_RELIABLE_DATAGRAM_ADDR 0xBB
 
-#define USE_RH_RELIABLE_DATAGRAM true
+#define USB_SERIAL_BAUD 115200
 
-//------------------------
-// Structure Declarations
-//------------------------
+#define DISPLAY_X        128
+#define DISPLAY_Y        32
+#define DISPLAY_CHAR_X   6
+#define DISPLAY_CHAR_Y   8
+#define DISPLAY_RX_START 65
+#define DISPLAY_TX_START 0
+#define DISPLAY_RX_LEN   DISPLAY_X - DISPLAY_RX_START
+#define DISPLAY_TX_LEN   60
+#define DISPLAY_RX_CHARS 10
+#define DISPLAY_TX_CHARS 10
 
-enum msgType_t
-{
-  msgType_dataRequest,
-  msgType_linkChangeRequest,
-  msgType_wakeRequest,
-  msgType_sleepRequest,
-  NUM_msgTypes
-};
+//--------------------------------
+// Callback function declarations
+//--------------------------------
 
-enum spreadingFactor_t
-{
-  spreadingFactor_sf7,
-  spreadingFactor_sf8,
-  spreadingFactor_sf9,
-  spreadingFactor_sf10,
-  spreadingFactor_sf11,
-  spreadingFactor_sf12,
-  NUM_spreadingFactors
-};
+void txInd (uint8_t const * txBuf,
+            uint8_t const bufLen,
+            uint8_t const destAddr,
+            bool ack);
+void rxInd (message_t const & rxMsg);
 
-uint8_t spreadingFactorTable [] = {7, 8, 9, 10, 11, 12};
+//---------
+// Classes
+//---------
 
-enum signalBandwidth_t
-{
-  signalBandwidth_125kHz,
-  signalBandwidth_250kHz,
-  signalBandwidth_500kHz,
-  signalBandwidth_625kHz,
-  NUM_signalBandwidths
-};
+userCallbacks_t callbacks = {txInd, rxInd};
 
-uint32_t signalBandwidthTable [] = {125000, 250000, 500000, 625000};
-
-enum frequencyChannel_t
-{
-  frequencyChannel_500kHz_Uplink_0,
-  frequencyChannel_500kHz_Uplink_1,
-  frequencyChannel_500kHz_Uplink_2,
-  frequencyChannel_500kHz_Uplink_3,
-  frequencyChannel_500kHz_Uplink_4,
-  frequencyChannel_500kHz_Uplink_5,
-  frequencyChannel_500kHz_Uplink_6,
-  frequencyChannel_500kHz_Uplink_7,
-  frequencyChannel_500kHz_Downlink_0,
-  frequencyChannel_500kHz_Downlink_1,
-  frequencyChannel_500kHz_Downlink_2,
-  frequencyChannel_500kHz_Downlink_3,
-  frequencyChannel_500kHz_Downlink_4,
-  frequencyChannel_500kHz_Downlink_5,
-  frequencyChannel_500kHz_Downlink_6,
-  frequencyChannel_500kHz_Downlink_7,
-  NUM_frequencyChannels
-};
-
-uint16_t frequencyChannelTable [] = {9030, 9046, 9062, 9078, 9094, 9110, 9126, 9142, 9233, 9239, 9245, 9251, 9257, 9263, 9269, 9275};
-
-//-----------------------
-// Variable Declarations
-//-----------------------
-
-RH_RF95 rf95(RFM95_CS, RFM95_INT);
-RHReliableDatagram rhReliableDatagram(rf95, RH_RELIABLE_DATAGRAM_ADDR);
-
-uint8_t txBuf[RH_RF95_MAX_MESSAGE_LEN];
-uint8_t txBufIdx = 0;
-uint8_t txSrcAddr;
-uint8_t txDestAddr;
-uint8_t txId;
-uint8_t txFlags;
-msgType_t txMsgType;
-
-uint8_t rxBuf[RH_RF95_MAX_MESSAGE_LEN];
-uint8_t rxBufLen = RH_RF95_MAX_MESSAGE_LEN;
-uint8_t rxSrcAddr;
-uint8_t rxDestAddr;
-uint8_t rxId;
-uint8_t rxFlags;
-msgType_t rxMsgType;
-
-char inputChar = 0;
-
-//-----------------------
-// Function Declarations
-//-----------------------
-
-void forceRadioReset();
-void setTxPower         (int8_t TxPower);
-void setSpreadingFactor (uint8_t spreadingFactor);
-void setBandwidth       (uint32_t bandwidth); 
-
-template <class dataPort_t>
-uint8_t buildStringFromSerial (dataPort_t* dataPort);
-uint8_t buildStringFromSerialInner ();
-
-void serviceTx ();
-void serviceRx ();
+loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
+                            RFM95_CS,
+                            RFM95_INT,
+                            RFM95_RST,
+                            callbacks);
+Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
+File dataFile;
+String dataFileName = "datalog.txt";
+String dataFileHeader = "Timestamp,Source Address,Destination Address,Message ID,Message Flags,Acknowleged,Message,spreadingFactor,signalBandwidth,frequencyChannel,txPower";
 
 //------------
 // Main Setup
@@ -133,204 +70,433 @@ void serviceRx ();
 
 void setup()
 {
-  digitalWrite(10, HIGH); // tie SD high
-  
-  pinMode(RFM95_RST, OUTPUT);
-  digitalWrite(RFM95_RST, HIGH);
   Serial.begin(USB_SERIAL_BAUD);
-  while (!Serial)
-  {
-    delay(1);
-  }
-  delay(100);
-  Serial.println("Feather LoRa Range Test - Base!");
+  //while (!Serial)
+  //{
+  //  delay(1);
+  //}
   
-  forceRadioReset();
+  digitalWrite(10, HIGH); // tie SD high
 
-  while (!rf95.init())
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
   {
-    Serial.println("LoRa radio init failed");
-    Serial.println("Uncomment '#define SERIAL_DEBUG' in RH_RF95.cpp for detailed debug info");
-    while (1);
+    Serial.println("Display initialization failed.");
   }
-  Serial.println("LoRa radio init OK!");
-
-  #if (USE_RH_RELIABLE_DATAGRAM > 0)
-  while (!rhReliableDatagram.init())
+  else
   {
-    Serial.println("Manager init failed");
-    while (1);
+    Serial.println("Display initialized.");
   }
-  Serial.println("Manager init OK!");
-  #endif // USE_RH_RELIABLE_DATAGRAM
+  pinMode(BUTTON_A, INPUT_PULLUP);
+  pinMode(BUTTON_B, INPUT_PULLUP);
+  pinMode(BUTTON_C, INPUT_PULLUP);
+  
+  display.display();
+  delay(1000);
+  display.clearDisplay();
+  display.display();
+  
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0,0);
+  
+  display.print("Radio:    ");
+  display.display();
+  if (!point2point.setupRadio())
+  {
+    display.println("failed");
+    display.display();
+    while(1);
+  }
+  else
+  {
+    display.println("OK");
+    display.display();
+  }
 
-  rf95.setSpreadingFactor(RFM95_DFLT_SF);
-  rf95.setSignalBandwidth(RFM95_DFLT_BW_Hz);
-  rf95.setTxPower(RFM95_DFLT_TX_POWER_dBm, false);
+  Serial.print("Initializing SD card...");
+  display.print("SD open:  ");
+  display.display();
+  if (!SD.begin(SD_CS))
+  {
+    Serial.println("Card failed or not present");
+    display.println("failed");
+    display.display();
+  }
+  else
+  {
+    Serial.println("Card initialized.");
+    display.println("OK");
+    display.display();
+  }
+
+  display.print("SD write: ");
+  display.display();
+  dataFile = SD.open(dataFileName, FILE_WRITE);
+  if (dataFile)
+  {
+    dataFile.println(dataFileHeader);
+    Serial.println("Header written to SD card.");
+    display.println("OK");
+    display.display();
+  }
+  else
+  {
+    Serial.println("SD card write failed.");
+    display.println("failed");
+    display.display();
+  }
+  dataFile.close();
+
+  display.println("Starting");
+  display.display();
+  delay(1000);
+  display.clearDisplay();
+  display.drawFastVLine(62,  0, 32, 1);
+  display.drawFastHLine(61,  0,  3, 1);
+  display.drawFastHLine(61, 31,  3, 1);
+  /* Test pattern, do not need.
+  display.fillRect( 0,  0, 16, 16, 1);
+  display.fillRect(16,  0, 16, 16, 0);
+  display.fillRect( 0  16, 16, 16, 0);
+  display.fillRect(16, 16, 16, 16, 1);
+  display.drawRect( 0,  0, 32, 32, 1);
+  */
+  display.display();
 }
 
 //-----------
 // Main Loop
 //-----------
 
-void loop() {
+uint32_t prevMillis = 0;
+uint32_t currentMillis = 0;
+uint32_t lastAckMillis = 0;
+uint32_t prevLinkChangeMillis = 0;
+uint32_t prevButtonScanMillis = 0;
+bool timeUp = false;
+
+spreadingFactor_t  spreadingFactor = RFM95_DFLT_SPREADING_FACTOR;
+signalBandwidth_t  signalBandwidth = RFM95_DFLT_SIGNAL_BANDWIDTH;
+frequencyChannel_t frequencyChannel = RFM95_DFLT_FREQ_CHANNEL;
+int8_t             txPower = RFM95_DFLT_TX_POWER_dBm;
+uint8_t varToIncrement = 0;
+uint8_t setting = 0;
+uint8_t const maxSettingValue [] = {uint8_t(NUM_spreadingFactors),
+                                    uint8_t(NUM_signalBandwidths),
+                                    uint8_t(NUM_frequencyChannels),
+                                    MAX_txPower};
+uint8_t settingSelectCount = 0;
+uint8_t valueSelectCount = 0;
+uint8_t enterCount = 0;
+uint8_t noPressCount = 0;
+bool settingSelect = false;
+bool valueSelect = false;
+bool enter = false;
+bool prevSettingSelect = false;
+bool prevValueSelect = false;
+bool prevEnter = false;
+bool valueChanged = false;
+bool suspendRadio = false;
+
+void loop()
+{
   // Transmit a string!
-  if (buildStringFromSerial<Serial_>(&Serial))
+  
+  currentMillis = millis();
+  //Serial.print("currentMillis = ");
+  //Serial.println(currentMillis);
+  //Serial.print("prevMillis = ");
+  //Serial.println(prevMillis);
+  //Serial.print("currentMillis - prevMillis = ");  
+  //Serial.println(currentMillis - prevMillis);
+  
+  
+  if ((currentMillis - prevButtonScanMillis) > 10)
   {
-    serviceTx();
-  }
-  serviceRx();
-}
-
-//----------------------
-// Function Definitions
-//----------------------
-
-void forceRadioReset ()
-{
-  digitalWrite(RFM95_RST, LOW);
-  delay(10);
-  digitalWrite(RFM95_RST, HIGH);
-  delay(10);
-}
-
-void setSpreadingFactor (spreadingFactor_t spreadingFactor)
-{
-  if (spreadingFactor >= NUM_spreadingFactors)
-  {
-    spreadingFactor = spreadingFactor_sf7;
-  }
-  uint8_t spreadingFactorToSet = spreadingFactorTable[spreadingFactor];
-  rf95.setSpreadingFactor(spreadingFactorToSet);
-  Serial.print("Set SF to: ");
-  Serial.println(spreadingFactorToSet);
-}
-
-void setBandwidth (signalBandwidth_t bandwidth)
-{
-  if (bandwidth >= NUM_signalBandwidths)
-  {
-    bandwidth = signalBandwidth_125kHz;
-  }
-  uint32_t bandwidthToSet = signalBandwidthTable[bandwidth];
-  rf95.setSignalBandwidth(bandwidthToSet);
-  Serial.print("Set BW to: ");
-  Serial.println(bandwidthToSet);
-}
-
-void setFrequencyChannel (frequencyChannel_t frequencyChannel)
-{
-  if (frequencyChannel >= NUM_frequencyChannels)
-  {
-    frequencyChannel = frequencyChannel_500kHz_Uplink_0;
-  }
-  float frequencyToSet = ((float)(frequencyChannelTable[frequencyChannel]))/10;
-  if (!rf95.setFrequency(frequencyToSet))
-  {
-    Serial.println("setFrequency failed");
-    while (1);
-  }
-  Serial.print("Set Freq to: ");
-  Serial.println(frequencyToSet);
-}
-
-template <class dataPort_t>
-uint8_t buildStringFromSerial (dataPort_t* dataPort)
-{
-  uint8_t retval;
-  while (dataPort->available())
-  {
-    inputChar = dataPort->read();
-    Serial.print(char(inputChar));
-    retval = buildStringFromSerialInner();
-  }
-  return retval;
-}
-
-uint8_t buildStringFromSerialInner ()
-{
-  // Add chars to ignore to this.
-  if ((inputChar != '\n'
-       && inputChar != '\r')
-      && txBufIdx < RH_RF95_MAX_MESSAGE_LEN)
-  {
-    txBuf[txBufIdx] = inputChar;
-    txBufIdx++;
-  }
-  // Special start key
-  if (inputChar == '$')
-  {
-    txBuf[txBufIdx] = 27;
-    txBufIdx++;
-  }
-  // \n triggers sending
-  if (inputChar == '\n')
-  {
-    return 1;
-  }
-  else
-  {
-    return 0;
-  }
-}
-
-void serviceTx ()
-{
-  if (txBufIdx > 0)
-  {
-    Serial.print("Attempting to transmit: \"");
-    for (uint8_t i = 0; i < txBufIdx; i++)
+    prevButtonScanMillis = currentMillis; // debounce
+    prevSettingSelect = settingSelect;
+    prevValueSelect = valueSelect;
+    prevEnter = enter;
+    settingSelect = !digitalRead(BUTTON_SETTING_SELECT);
+    valueSelect = !digitalRead(BUTTON_VALUE_SELECT);
+    enter = !digitalRead(BUTTON_ENTER);
+    if (settingSelect)
     {
-      Serial.print(char(txBuf[i]));
+      noPressCount = 0;
+      settingSelectCount++;
+      Serial.print("A:");
+      Serial.println(settingSelectCount);
     }
-    Serial.println('\"');
-    rf95.waitCAD();
-    #if (USE_RH_RELIABLE_DATAGRAM > 0)
-    if (rhReliableDatagram.sendtoWait(txBuf, txBufIdx, 0xEE) == true)
+    if (valueSelect)
     {
-      Serial.println("Sent successfully & acknowleged!");
+      noPressCount = 0;
+      valueSelectCount++;
+      Serial.print("B:");
+      Serial.println(valueSelectCount);
     }
-    txBufIdx = 0;
-    #else // USE_RH_RELIABLE_DATAGRAM
-    rf95.send(txBuf, txBufIdx);
-    txBufIdx = 0;
-    rf95.waitPacketSent();
-    #endif  // USE_RH_RELIABLE_DATAGRAM
-    Serial.println("Sent successfully!");
-  }
-  else
-  {
-    Serial.print("Nothing to transmit: TX buffer empty.");
-  }
-}
-
-void serviceRx ()
-{
-  if (
-      #if (USE_RH_RELIABLE_DATAGRAM > 0)
-      rhReliableDatagram.recvfromAckTimeout(rxBuf,
-                                     &rxBufLen,
-                                     500,
-                                     &rxSrcAddr,
-                                     &rxDestAddr,
-                                     &rxId,
-                                     &rxFlags)
-      #else // USE_RH_RELIABLE_DATAGRAM
-      rf95.recv(rxBuf, &rxBufLen)
-      #endif  // USE_RH_RELIABLE_DATAGRAM
-     )
-  {
-    switch (rxBuf[0])
+    if (enter)
     {
-      default:
-      Serial.print("Received: \"");
-      for (uint8_t i = 0; i < rxBufLen; i++)
+      noPressCount = 0;
+      enterCount++;
+      Serial.print("C:");
+      Serial.println(enterCount);
+    }
+    if (!(enter || valueSelect || enter))
+    {
+      noPressCount++;
+      //Serial.print("N:");
+      //Serial.println(noPressCount);
+    }
+    if (noPressCount == 2)
+    {
+      settingSelectCount = 0;
+      valueSelectCount = 0;
+      enterCount = 0;
+      noPressCount = 0;
+    }
+    if (settingSelectCount == 2)
+    {
+      valueSelectCount = 0;
+      enterCount = 0;
+      setting++;
+      if (setting > 3)
       {
-        Serial.print(char(rxBuf[i]));
+        setting = 0;
       }
-      Serial.println("\"");
-      rxBufLen = RH_RF95_MAX_MESSAGE_LEN;
-      break;
     }
+    if (valueSelectCount == 2)
+    {
+      settingSelectCount = 0;
+      enterCount = 0;
+      noPressCount = 0;
+      valueChanged = true;
+      switch (setting)
+      {
+        case 0:
+          spreadingFactor++;
+          break;
+        case 1:
+          signalBandwidth++;
+          break;
+        case 2:
+          frequencyChannel++;
+          break;
+        case 3:
+          txPower++;
+          if (txPower > MAX_txPower)
+          {
+            txPower = 1;
+          }
+          break;
+      }
+    }
+    if (enterCount == 2)
+    {
+      settingSelectCount = 0;
+      valueSelectCount = 0;
+      noPressCount = 0;
+      switch (setting)
+      {
+        case 0:
+          point2point.setSpreadingFactor(spreadingFactor);
+          break;
+        case 1:
+          point2point.setBandwidth(signalBandwidth);
+          break;
+        case 2:
+          point2point.setFrequencyChannel(frequencyChannel);
+          break;
+        case 3:
+          point2point.setTxPower(txPower);
+          break;
+      }
+      valueChanged = false;
+    }
+    display.fillRect(DISPLAY_RX_START, DISPLAY_CHAR_Y*3, DISPLAY_RX_LEN, DISPLAY_CHAR_Y, 0);
+    display.setCursor(DISPLAY_RX_START, DISPLAY_CHAR_Y*3);
+    switch (setting)
+    {
+      case 0:
+        display.print("S");
+        display.print(int(spreadingFactor));
+        break;
+      case 1:
+        display.print("B");
+        display.print(int(signalBandwidth));
+        break;
+      case 2:
+        display.print("C");
+        display.print(int(frequencyChannel));
+        break;
+      case 3:
+        display.print("P");
+        display.print(txPower);
+        break;
+    }
+    if (valueChanged)
+    {
+      display.print("*");
+    }
+    display.display();
   }
+  if (suspendRadio == false)
+  {
+    if ((currentMillis - prevMillis) > 5000)
+    {
+      point2point.setTxMessage((uint8_t*)("foobar"), 6);
+      prevMillis = currentMillis;
+      timeUp = true;
+    }
+    if (point2point.buildStringFromSerial(&Serial) || timeUp)
+    {
+      point2point.serviceTx(0xEE);
+      timeUp = false;
+    }
+    /*
+    if 
+       //(false)
+       ((currentMillis - prevLinkChangeMillis) > 21010)
+    {
+      //point2point.linkChangeReq(0xEE, spreadingFactor, signalBandwidth, frequencyChannel, txPower);
+      prevLinkChangeMillis = currentMillis;
+      switch (varToIncrement)
+      {
+      case 0:
+      //spreadingFactor = spreadingFactor_sf8;
+      //point2point.setSpreadingFactor(spreadingFactor_sf8);
+      varToIncrement++;
+      break;
+      case 1:
+      //signalBandwidth = signalBandwidth_250kHz;
+      point2point.setBandwidth(signalBandwidth_250kHz);
+      varToIncrement++;
+      break;
+      case 2:
+      //frequencyChannel = frequencyChannel_500kHz_Uplink_1;
+      point2point.setFrequencyChannel(frequencyChannel_500kHz_Uplink_1);
+      varToIncrement++;
+      break;
+      case 3:
+      //txPower++;
+      point2point.setTxPower(16);
+      varToIncrement++;
+      break;
+      default:
+      break;
+      }
+    }
+    */
+  
+    point2point.serviceRx(); 
+  }
+}
+
+//-------------------------------
+// Callback function definitions
+//-------------------------------
+
+void txInd (uint8_t const * txBuf,
+            uint8_t const bufLen,
+            uint8_t const destAddr,
+            bool ack)
+{
+  dataFile = SD.open(dataFileName, FILE_WRITE);
+  if (dataFile)
+  {
+    dataFile.print(millis());
+    dataFile.print(",");
+    dataFile.print(RH_RELIABLE_DATAGRAM_ADDR, HEX);
+    dataFile.print(",");
+    dataFile.print(destAddr, HEX);
+    dataFile.print(",,,");
+    dataFile.print(ack);
+    dataFile.print(",");
+    dataFile.print(spreadingFactor);
+    dataFile.print(",");
+    dataFile.print(signalBandwidth);
+    dataFile.print(",");
+    dataFile.print(frequencyChannel);
+    dataFile.print(",");
+    dataFile.print(txPower);
+    for (uint8_t i = 0; i < bufLen; i++)
+    {
+      dataFile.print(char(txBuf[i]));
+    }
+    dataFile.println();
+    Serial.println("TX data written to SD card.");
+  }
+  else
+  {
+    Serial.println("SD card write failed.");
+  }
+  dataFile.close();
+  display.fillRect(DISPLAY_TX_START, 0, DISPLAY_TX_LEN, DISPLAY_Y, 0);
+  display.setCursor(DISPLAY_TX_START, 0);
+  display.print("To ");
+  display.print(destAddr, HEX);
+  display.print("h ");
+  if (ack == true)
+  {
+    lastAckMillis = currentMillis;
+    display.print("ACK");
+  }
+  else
+  {
+    display.print("NAK");
+  }
+  display.setCursor(DISPLAY_TX_START, DISPLAY_CHAR_Y);
+  for (uint8_t i = 0; (i < bufLen) && (i < DISPLAY_RX_CHARS); i++)
+  {
+    display.print(char(txBuf[i]));
+  }
+  display.setCursor(DISPLAY_TX_START, DISPLAY_CHAR_Y*2);
+  display.print("TX:");
+  display.print(currentMillis/1000);
+  display.setCursor(DISPLAY_TX_START, DISPLAY_CHAR_Y*3);
+  display.print("A.:");
+  display.print(lastAckMillis/1000);
+  display.display();
+}
+
+void rxInd (message_t const & rxMsg)
+{
+  dataFile = SD.open(dataFileName, FILE_WRITE);
+  if (dataFile)
+  {
+    dataFile.print(millis());
+    dataFile.print(",");
+    dataFile.print(rxMsg.srcAddr, HEX);
+    dataFile.print(",");
+    dataFile.print(rxMsg.destAddr, HEX);
+    dataFile.print(",");
+    dataFile.print(rxMsg.msgId);
+    dataFile.print(",");
+    dataFile.print(rxMsg.flags);
+    dataFile.print(",,");
+    for (uint8_t i = 0; i < rxMsg.bufLen; i++)
+    {
+      dataFile.print(char(rxMsg.buf[i]));
+    }
+    dataFile.println();
+    Serial.println("RX data written to SD card.");
+  }
+  else
+  {
+    Serial.println("SD card write failed.");
+  }
+  dataFile.close();
+  display.fillRect(DISPLAY_RX_START, 0, DISPLAY_RX_LEN, DISPLAY_CHAR_Y*3, 0);
+  display.setCursor(DISPLAY_RX_START, 0);
+  display.print("From ");
+  display.print(rxMsg.srcAddr, HEX);
+  display.print("h");
+  display.setCursor(DISPLAY_RX_START, DISPLAY_CHAR_Y);
+  for (uint8_t i = 0; (i < rxMsg.bufLen) && (i < DISPLAY_RX_CHARS); i++)
+  {
+    display.print(char(rxMsg.buf[i]));
+  }
+  display.setCursor(DISPLAY_RX_START, DISPLAY_CHAR_Y*2);
+  display.print("RX:");
+  display.print(currentMillis/1000);
+  display.display();
 }

@@ -15,6 +15,9 @@
 #define BUTTON_A 9
 #define BUTTON_B 6
 #define BUTTON_C 5
+#define BUTTON_SETTING_SELECT BUTTON_A
+#define BUTTON_VALUE_SELECT   BUTTON_B
+#define BUTTON_ENTER          BUTTON_C
 
 #define SD_CS     10
 #define RFM95_CS  8
@@ -59,7 +62,7 @@ loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
 Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 File dataFile;
 String dataFileName = "datalog.txt";
-String dataFileHeader = "Timestamp,Source Address,Destination Address,Message ID,Message Flags,Acknowleged,Message";
+String dataFileHeader = "Timestamp,Source Address,Destination Address,Message ID,Message Flags,Acknowleged,Message,spreadingFactor,signalBandwidth,frequencyChannel,txPower";
 
 //------------
 // Main Setup
@@ -68,10 +71,10 @@ String dataFileHeader = "Timestamp,Source Address,Destination Address,Message ID
 void setup()
 {
   Serial.begin(USB_SERIAL_BAUD);
-  while (!Serial)
-  {
-    delay(1);
-  }
+  //while (!Serial)
+  //{
+  //  delay(1);
+  //}
   
   digitalWrite(10, HIGH); // tie SD high
 
@@ -83,6 +86,9 @@ void setup()
   {
     Serial.println("Display initialized.");
   }
+  pinMode(BUTTON_A, INPUT_PULLUP);
+  pinMode(BUTTON_B, INPUT_PULLUP);
+  pinMode(BUTTON_C, INPUT_PULLUP);
   
   display.display();
   delay(1000);
@@ -165,7 +171,32 @@ void setup()
 uint32_t prevMillis = 0;
 uint32_t currentMillis = 0;
 uint32_t lastAckMillis = 0;
+uint32_t prevLinkChangeMillis = 0;
+uint32_t prevButtonScanMillis = 0;
 bool timeUp = false;
+
+spreadingFactor_t  spreadingFactor = RFM95_DFLT_SPREADING_FACTOR;
+signalBandwidth_t  signalBandwidth = RFM95_DFLT_SIGNAL_BANDWIDTH;
+frequencyChannel_t frequencyChannel = RFM95_DFLT_FREQ_CHANNEL;
+int8_t             txPower = RFM95_DFLT_TX_POWER_dBm;
+uint8_t varToIncrement = 0;
+uint8_t setting = 0;
+uint8_t const maxSettingValue [] = {uint8_t(NUM_spreadingFactors),
+                                    uint8_t(NUM_signalBandwidths),
+                                    uint8_t(NUM_frequencyChannels),
+                                    MAX_txPower};
+uint8_t settingSelectCount = 0;
+uint8_t valueSelectCount = 0;
+uint8_t enterCount = 0;
+uint8_t noPressCount = 0;
+bool settingSelect = false;
+bool valueSelect = false;
+bool enter = false;
+bool prevSettingSelect = false;
+bool prevValueSelect = false;
+bool prevEnter = false;
+bool valueChanged = false;
+bool suspendRadio = false;
 
 void loop()
 {
@@ -179,22 +210,185 @@ void loop()
   //Serial.print("currentMillis - prevMillis = ");  
   //Serial.println(currentMillis - prevMillis);
   
-  if ((currentMillis - prevMillis) > 5000)
-  {
-    Serial.println("foo");
-    point2point.setTxMessage((uint8_t*)("foobar"), 6);
-    prevMillis = currentMillis;
-    timeUp = true;
-  }
   
-  if (point2point.buildStringFromSerial(&Serial) || timeUp)
+  if ((currentMillis - prevButtonScanMillis) > 10)
   {
-    point2point.serviceTx(0xEE);
-    Serial.println("bar");
-    timeUp = false;
+    prevButtonScanMillis = currentMillis; // debounce
+    prevSettingSelect = settingSelect;
+    prevValueSelect = valueSelect;
+    prevEnter = enter;
+    settingSelect = !digitalRead(BUTTON_SETTING_SELECT);
+    valueSelect = !digitalRead(BUTTON_VALUE_SELECT);
+    enter = !digitalRead(BUTTON_ENTER);
+    if (settingSelect)
+    {
+      noPressCount = 0;
+      settingSelectCount++;
+      Serial.print("A:");
+      Serial.println(settingSelectCount);
+    }
+    if (valueSelect)
+    {
+      noPressCount = 0;
+      valueSelectCount++;
+      Serial.print("B:");
+      Serial.println(valueSelectCount);
+    }
+    if (enter)
+    {
+      noPressCount = 0;
+      enterCount++;
+      Serial.print("C:");
+      Serial.println(enterCount);
+    }
+    if (!(enter || valueSelect || enter))
+    {
+      noPressCount++;
+      //Serial.print("N:");
+      //Serial.println(noPressCount);
+    }
+    if (noPressCount == 2)
+    {
+      settingSelectCount = 0;
+      valueSelectCount = 0;
+      enterCount = 0;
+      noPressCount = 0;
+    }
+    if (settingSelectCount == 2)
+    {
+      valueSelectCount = 0;
+      enterCount = 0;
+      setting++;
+      if (setting > 3)
+      {
+        setting = 0;
+      }
+    }
+    if (valueSelectCount == 2)
+    {
+      settingSelectCount = 0;
+      enterCount = 0;
+      noPressCount = 0;
+      valueChanged = true;
+      switch (setting)
+      {
+        case 0:
+          spreadingFactor++;
+          break;
+        case 1:
+          signalBandwidth++;
+          break;
+        case 2:
+          frequencyChannel++;
+          break;
+        case 3:
+          txPower++;
+          if (txPower > MAX_txPower)
+          {
+            txPower = 1;
+          }
+          break;
+      }
+    }
+    if (enterCount == 2)
+    {
+      settingSelectCount = 0;
+      valueSelectCount = 0;
+      noPressCount = 0;
+      switch (setting)
+      {
+        case 0:
+          point2point.setSpreadingFactor(spreadingFactor);
+          break;
+        case 1:
+          point2point.setBandwidth(signalBandwidth);
+          break;
+        case 2:
+          point2point.setFrequencyChannel(frequencyChannel);
+          break;
+        case 3:
+          point2point.setTxPower(txPower);
+          break;
+      }
+      valueChanged = false;
+    }
+    display.fillRect(DISPLAY_RX_START, DISPLAY_CHAR_Y*3, DISPLAY_RX_LEN, DISPLAY_CHAR_Y, 0);
+    display.setCursor(DISPLAY_RX_START, DISPLAY_CHAR_Y*3);
+    switch (setting)
+    {
+      case 0:
+        display.print("S");
+        display.print(int(spreadingFactor));
+        break;
+      case 1:
+        display.print("B");
+        display.print(int(signalBandwidth));
+        break;
+      case 2:
+        display.print("C");
+        display.print(int(frequencyChannel));
+        break;
+      case 3:
+        display.print("P");
+        display.print(txPower);
+        break;
+    }
+    if (valueChanged)
+    {
+      display.print("*");
+    }
+    display.display();
   }
+  if (suspendRadio == false)
+  {
+    if ((currentMillis - prevMillis) > 5000)
+    {
+      point2point.setTxMessage((uint8_t*)("foobar"), 6);
+      prevMillis = currentMillis;
+      timeUp = true;
+    }
+    if (point2point.buildStringFromSerial(&Serial) || timeUp)
+    {
+      point2point.serviceTx(0xEE);
+      timeUp = false;
+    }
+    /*
+    if 
+       //(false)
+       ((currentMillis - prevLinkChangeMillis) > 21010)
+    {
+      //point2point.linkChangeReq(0xEE, spreadingFactor, signalBandwidth, frequencyChannel, txPower);
+      prevLinkChangeMillis = currentMillis;
+      switch (varToIncrement)
+      {
+      case 0:
+      //spreadingFactor = spreadingFactor_sf8;
+      //point2point.setSpreadingFactor(spreadingFactor_sf8);
+      varToIncrement++;
+      break;
+      case 1:
+      //signalBandwidth = signalBandwidth_250kHz;
+      point2point.setBandwidth(signalBandwidth_250kHz);
+      varToIncrement++;
+      break;
+      case 2:
+      //frequencyChannel = frequencyChannel_500kHz_Uplink_1;
+      point2point.setFrequencyChannel(frequencyChannel_500kHz_Uplink_1);
+      varToIncrement++;
+      break;
+      case 3:
+      //txPower++;
+      point2point.setTxPower(16);
+      varToIncrement++;
+      break;
+      default:
+      break;
+      }
+    }
+    */
   
-  point2point.serviceRx();
+    point2point.serviceRx(); 
+  }
 }
 
 //-------------------------------
@@ -217,6 +411,13 @@ void txInd (uint8_t const * txBuf,
     dataFile.print(",,,");
     dataFile.print(ack);
     dataFile.print(",");
+    dataFile.print(spreadingFactor);
+    dataFile.print(",");
+    dataFile.print(signalBandwidth);
+    dataFile.print(",");
+    dataFile.print(frequencyChannel);
+    dataFile.print(",");
+    dataFile.print(txPower);
     for (uint8_t i = 0; i < bufLen; i++)
     {
       dataFile.print(char(txBuf[i]));
@@ -284,7 +485,7 @@ void rxInd (message_t const & rxMsg)
     Serial.println("SD card write failed.");
   }
   dataFile.close();
-  display.fillRect(DISPLAY_RX_START, 0, DISPLAY_RX_LEN, DISPLAY_Y, 0);
+  display.fillRect(DISPLAY_RX_START, 0, DISPLAY_RX_LEN, DISPLAY_CHAR_Y*3, 0);
   display.setCursor(DISPLAY_RX_START, 0);
   display.print("From ");
   display.print(rxMsg.srcAddr, HEX);

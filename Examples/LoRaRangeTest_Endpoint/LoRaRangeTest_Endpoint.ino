@@ -40,7 +40,7 @@ loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
                             callbacks);
 
 //------------
-// Main Setup
+// Main Setup 
 //------------
 
 void setup()
@@ -58,14 +58,60 @@ void setup()
 //-----------
 // Main Loop
 //-----------
- 
+
+uint32_t prevMillis = 0;
+uint32_t currentMillis = 0;
+uint32_t lastAckMillis = 0;
+uint32_t prevLinkChangeMillis = 0;
+bool timeUp = false;
+uint8_t varToIncrement = 0;
+
 void loop()
 {
+  currentMillis = millis();
+  
   // Transmit a string!
   if (point2point.buildStringFromSerial(&Serial))
   {
     point2point.serviceTx(0xBB);
   }
+
+  /*
+  if 
+     //(false)
+     ((currentMillis - prevLinkChangeMillis) > 21010)
+  {
+    //point2point.linkChangeReq(0xEE, spreadingFactor, signalBandwidth, frequencyChannel, txPower);
+    prevLinkChangeMillis = currentMillis;
+
+    switch (varToIncrement)
+    {
+    case 0:
+      //spreadingFactor = spreadingFactor_sf8;
+      //point2point.setSpreadingFactor(spreadingFactor_sf8);
+      varToIncrement++;
+      break;
+    case 1:
+      //signalBandwidth = signalBandwidth_250kHz;
+      point2point.setBandwidth(signalBandwidth_250kHz);
+      varToIncrement++;
+      break;
+    case 2:
+      //frequencyChannel = frequencyChannel_500kHz_Uplink_1;
+      point2point.setFrequencyChannel(frequencyChannel_500kHz_Uplink_1);
+      varToIncrement++;
+      break;
+    case 3:
+      //txPower++;
+      point2point.setTxPower(16);
+      varToIncrement++;
+      break;
+    default:
+      break;
+    }
+  }
+  */
+  
   point2point.serviceRx();
 }
 

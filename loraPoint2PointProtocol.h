@@ -13,12 +13,12 @@
 // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
 // you can set transmitter powers from 5 to 23 dBm:
 #define RFM95_DFLT_FREQ_CHANNEL     frequencyChannel_500kHz_Uplink_0
-#define RFM95_DFLT_SPREADING_FACTOR spreadingFactor_sf7
+#define RFM95_DFLT_SPREADING_FACTOR spreadingFactor_sf7 // spreadingFactor_sf8
 #define RFM95_DFLT_TX_POWER_dBm     15
-#define RFM95_DFLT_SIGNAL_BANDWIDTH signalBandwidth_500kHz
+#define RFM95_DFLT_SIGNAL_BANDWIDTH signalBandwidth_500kHz // signalBandwidth_250kHz
 #define RH_RF95_MAX_MESSAGE_LEN 128
 
-#define LINK_CHANGE_TIMEOUT_MILLIS 5000
+#define LINK_CHANGE_TIMEOUT_MILLIS 500
 
 #define USE_RH_RELIABLE_DATAGRAM true
 
@@ -71,7 +71,7 @@ enum eventStatus_t
 enum msgType_t
 {
   msgType_undefined,
-  msgType_dataRequest,
+  msgType_dataReq,
   msgType_dataRsp,
   msgType_linkChangeReq,
   msgType_linkChangeRsp,
@@ -91,6 +91,8 @@ enum spreadingFactor_t
   NUM_spreadingFactors
 };
 
+spreadingFactor_t& operator++(spreadingFactor_t& s, int);
+
 enum signalBandwidth_t
 {
   signalBandwidth_125kHz,
@@ -100,6 +102,8 @@ enum signalBandwidth_t
   NUM_signalBandwidths
 };
 
+signalBandwidth_t& operator++(signalBandwidth_t& b, int);
+ 
 enum frequencyChannel_t
 {
   frequencyChannel_500kHz_Uplink_0,
@@ -120,6 +124,10 @@ enum frequencyChannel_t
   frequencyChannel_500kHz_Downlink_7,
   NUM_frequencyChannels
 };
+
+frequencyChannel_t& operator++(frequencyChannel_t& f, int);
+
+#define MAX_txPower 20
 
 //-----------------------
 // Class Declarations
@@ -181,6 +189,7 @@ class loraPoint2Point
     //goToSleep ();
   private:
     // Private variables
+    bool serialCommandMode = false;
     uint8_t rfm95Rst = 4;
     uint8_t thisAddress = 0;
     spreadingFactor_t  currentSpreadingFactor  = RFM95_DFLT_SPREADING_FACTOR;
@@ -193,6 +202,7 @@ class loraPoint2Point
     int8_t             previousTxPower          = currentTxPower;
     message_t txMsg = {0, 0, 0, 0, 0};
     message_t rxMsg = {0, 0, 0, 0, RH_RF95_MAX_MESSAGE_LEN};
+    message_t serialCmd = {0, 0, 0, 0, 0};
     const uint8_t spreadingFactorTable [NUM_spreadingFactors] = {7, 8, 9, 10, 11, 12};
     const uint32_t signalBandwidthTable [NUM_signalBandwidths] = {125000, 250000, 500000, 625000};
     const uint16_t frequencyChannelTable [NUM_frequencyChannels] = {9030, 9046, 9062, 9078, 9094, 9110, 9126, 9142, 9233, 9239, 9245, 9251, 9257, 9263, 9269, 9275};

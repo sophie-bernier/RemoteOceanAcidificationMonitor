@@ -128,6 +128,7 @@ void loraPoint2Point::setSpreadingFactor (spreadingFactor_t spreadingFactor)
   }
   uint8_t spreadingFactorToSet = spreadingFactorTable[spreadingFactor];
   rf95.setSpreadingFactor(spreadingFactorToSet);
+  rf95.setModeIdle(); // Required to update radio settings.
   previousSpreadingFactor = currentSpreadingFactor;
   currentSpreadingFactor = spreadingFactor;
   Serial.print("Set SF to: ");
@@ -142,6 +143,7 @@ void loraPoint2Point::setBandwidth (signalBandwidth_t bandwidth)
   }
   uint32_t bandwidthToSet = signalBandwidthTable[bandwidth];
   rf95.setSignalBandwidth(bandwidthToSet);
+  rf95.setModeIdle(); // Required to update radio settings.
   previousSignalBandwidth = currentSignalBandwidth;
   currentSignalBandwidth = bandwidth;
   Serial.print("Set BW to: ");
@@ -162,6 +164,7 @@ void loraPoint2Point::setFrequencyChannel (frequencyChannel_t frequencyChannel)
   }
   else
   {
+    rf95.setModeIdle(); // Required to update radio settings.
     previousFrequencyChannel = currentFrequencyChannel;
     currentFrequencyChannel = frequencyChannel;
     Serial.print("Set Freq to: ");
@@ -176,6 +179,7 @@ void loraPoint2Point::setTxPower (int8_t txPower)
     txPower = RFM95_DFLT_TX_POWER_dBm;
   }
   rf95.setTxPower(txPower, false);
+  rf95.setModeIdle(); // Required to update radio settings.
   previousTxPower = currentTxPower;
   currentTxPower = txPower;
   Serial.print("Set TX power to: ");
@@ -336,7 +340,9 @@ void loraPoint2Point::linkChangeReq (uint8_t const            destAddress,
     setFrequencyChannel(frequencyChannel);
     // Start timer
     // call linkChangeReqTimeout if serviceLinkChangeRsp is not received in 5s.
-    linkChangeTimeoutTimer.reset();
+    linkChangeTimeoutTimer.pause();
+    linkChangeTimeoutTimer.clearDone();
+    serviceTimers();
     linkChangeTimeoutTimer.start();
   }
   else
@@ -348,6 +354,7 @@ void loraPoint2Point::linkChangeReq (uint8_t const            destAddress,
 void loraPoint2Point::linkChangeReqTimeout ()
 {
   Serial.println("Link change request timed out.");
+  linkChangeTimeoutTimer.clearDone();
   setSpreadingFactor(previousSpreadingFactor);
   setBandwidth(previousSignalBandwidth);
   setTxPower(previousTxPower);
@@ -383,6 +390,7 @@ void loraPoint2Point::serviceLinkChangeReq (uint8_t const            srcAddress,
                                  uint8_t(currentSignalBandwidth),
                                  uint8_t(currentFrequencyChannel),
                                  uint8_t(currentTxPower)};
+  delay(100); // Prevent race conditions
   if (rhReliableDatagram.sendtoWait(linkChangeRspBuf, 5, srcAddress) == true)
   {
     Serial.println("Link change response acknowleged!");
@@ -403,7 +411,7 @@ void loraPoint2Point::serviceLinkChangeRsp ()
 {
   Serial.println("Link change response received. Transmission OK on new settings!");
   linkChangeTimeoutTimer.pause();
-  linkChangeTimeoutTimer.reset();
+  serviceTimers();
 }
 
 void loraPoint2Point::serviceTimers ()
@@ -480,7 +488,6 @@ void loraPoint2Point::serviceRx ()
           Serial.print(char(rxMsg.buf[i]));
         }
         Serial.println("\"");
-        rxMsg.bufLen = RH_RF95_MAX_MESSAGE_LEN;
         break;
       case msgType_dataRsp:
         break;
@@ -497,6 +504,7 @@ void loraPoint2Point::serviceRx ()
       default:
         break;
     }
+    rxMsg.bufLen = RH_RF95_MAX_MESSAGE_LEN;
   }
 }
 

@@ -44,6 +44,14 @@ class simpleTimer
     {
       if (started)
       {
+        /*
+        Serial.print("currentMillis: ");
+        Serial.println(currentMillis);
+        Serial.print("referenceMillis: ");
+        Serial.println(referenceMillis);
+        Serial.print("cur-ref: ");
+        Serial.println(currentMillis - referenceMillis);
+        */
         if ((currentMillis - referenceMillis) > timeoutMillis)
         {
           done = true;
@@ -61,9 +69,9 @@ class simpleTimer
       else
       {
         // Option 1: Keep advancing referenceMillis so that timer does not advance.
-        referenceMillis += currentMillis - referenceMillis;
+        //referenceMillis += currentMillis - referenceMillis;
         // Option 2: Reset timer on stop.
-        // referenceMillis = currentMillis;
+        referenceMillis = currentMillis;
       }
     }
     bool isRunning ()

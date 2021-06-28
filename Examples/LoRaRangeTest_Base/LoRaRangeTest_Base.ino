@@ -47,12 +47,16 @@ void txInd (uint8_t const * txBuf,
             uint8_t const destAddr,
             bool ack);
 void rxInd (message_t const & rxMsg);
+void linkChangeInd (spreadingFactor_t const newSpreadingFactor,
+                    signalBandwidth_t const newSignalBandwidth,
+                    frequencyChannel_t const newFrequencyChannel,
+                    int8_t const newTxPower);
 
 //---------
 // Classes
 //---------
 
-userCallbacks_t callbacks = {txInd, rxInd};
+userCallbacks_t callbacks = {txInd, rxInd, linkChangeInd};
 
 loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
                             RFM95_CS,
@@ -63,6 +67,14 @@ Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 File dataFile;
 String dataFileName = "datalog.txt";
 String dataFileHeader = "Timestamp,Source Address,Destination Address,Message ID,Message Flags,Acknowleged,Message,spreadingFactor,signalBandwidth,frequencyChannel,txPower";
+
+//-----------------
+// Local functions
+//-----------------
+
+void updateSettingDisplay ();
+void readButtons ();
+void processButtons ();
 
 //------------
 // Main Setup
@@ -199,7 +211,7 @@ bool valueChanged = false;
 bool suspendRadio = false;
 
 void loop()
-{
+{  
   // Transmit a string!
   
   currentMillis = millis();
@@ -228,7 +240,7 @@ void loop()
       Serial.println(settingSelectCount);
     }
     if (valueSelect)
-    {
+    { 
       noPressCount = 0;
       valueSelectCount++;
       Serial.print("B:");
@@ -249,15 +261,22 @@ void loop()
     }
     if (noPressCount == 2)
     {
+      noPressCount++;
       settingSelectCount = 0;
       valueSelectCount = 0;
       enterCount = 0;
       noPressCount = 0;
     }
+    if (noPressCount == 10)
+    {
+      noPressCount = 0;
+    }
     if (settingSelectCount == 2)
     {
+      settingSelectCount++;
       valueSelectCount = 0;
       enterCount = 0;
+      noPressCount = 0;
       setting++;
       if (setting > 3)
       {
@@ -266,6 +285,7 @@ void loop()
     }
     if (valueSelectCount == 2)
     {
+      valueSelectCount++;
       settingSelectCount = 0;
       enterCount = 0;
       noPressCount = 0;
@@ -292,9 +312,18 @@ void loop()
     }
     if (enterCount == 2)
     {
+      enterCount++;
       settingSelectCount = 0;
       valueSelectCount = 0;
       noPressCount = 0;
+      point2point.linkChangeReq(0xEE, spreadingFactor, signalBandwidth, frequencyChannel, txPower);
+      /*
+      spreadingFactor = point2point.getSpreadingfactor();
+      signalBandwidth = point2point.getSignalBandwidth();
+      frequencyChannel = point2point.getFrequencyChannel();
+      txPower = point2point.getTxPower();
+      */
+      /*
       switch (setting)
       {
         case 0:
@@ -310,6 +339,7 @@ void loop()
           point2point.setTxPower(txPower);
           break;
       }
+      */
       valueChanged = false;
     }
     display.fillRect(DISPLAY_RX_START, DISPLAY_CHAR_Y*3, DISPLAY_RX_LEN, DISPLAY_CHAR_Y, 0);
@@ -337,6 +367,12 @@ void loop()
     {
       display.print("*");
     }
+    else
+    {
+      display.print(" ");
+    }
+    display.print(int(point2point.getPacketErrorFraction()*100));
+    display.print("%");
     display.display();
   }
   if (suspendRadio == false)
@@ -347,38 +383,38 @@ void loop()
       prevMillis = currentMillis;
       timeUp = true;
     }
+    
     if (point2point.buildStringFromSerial(&Serial) || timeUp)
     {
       point2point.serviceTx(0xEE);
       timeUp = false;
     }
     /*
-    if 
+    if ((currentMillis - prevLinkChangeMillis) > 21010)
        //(false)
-       ((currentMillis - prevLinkChangeMillis) > 21010)
     {
-      //point2point.linkChangeReq(0xEE, spreadingFactor, signalBandwidth, frequencyChannel, txPower);
+      point2point.linkChangeReq(0xEE, spreadingFactor, signalBandwidth, frequencyChannel, txPower);
       prevLinkChangeMillis = currentMillis;
       switch (varToIncrement)
       {
       case 0:
-      //spreadingFactor = spreadingFactor_sf8;
+      spreadingFactor = spreadingFactor_sf8;
       //point2point.setSpreadingFactor(spreadingFactor_sf8);
       varToIncrement++;
       break;
       case 1:
-      //signalBandwidth = signalBandwidth_250kHz;
-      point2point.setBandwidth(signalBandwidth_250kHz);
+      signalBandwidth = signalBandwidth_250kHz;
+      //point2point.setBandwidth(signalBandwidth_250kHz);
       varToIncrement++;
       break;
       case 2:
-      //frequencyChannel = frequencyChannel_500kHz_Uplink_1;
-      point2point.setFrequencyChannel(frequencyChannel_500kHz_Uplink_1);
+      frequencyChannel = frequencyChannel_500kHz_Uplink_1;
+      //point2point.setFrequencyChannel(frequencyChannel_500kHz_Uplink_1);
       varToIncrement++;
       break;
       case 3:
-      //txPower++;
-      point2point.setTxPower(16);
+      txPower++;
+      //point2point.setTxPower(16);
       varToIncrement++;
       break;
       default:
@@ -386,7 +422,6 @@ void loop()
       }
     }
     */
-  
     point2point.serviceRx(); 
   }
 }
@@ -453,8 +488,10 @@ void txInd (uint8_t const * txBuf,
   display.print("TX:");
   display.print(currentMillis/1000);
   display.setCursor(DISPLAY_TX_START, DISPLAY_CHAR_Y*3);
-  display.print("A.:");
+  display.print("A:");
   display.print(lastAckMillis/1000);
+  display.print(" ");
+  display.print(point2point.getLastAckSNR());
   display.display();
 }
 
@@ -499,4 +536,15 @@ void rxInd (message_t const & rxMsg)
   display.print("RX:");
   display.print(currentMillis/1000);
   display.display();
+}
+
+void linkChangeInd (spreadingFactor_t const newSpreadingFactor,
+                    signalBandwidth_t const newSignalBandwidth,
+                    frequencyChannel_t const newFrequencyChannel,
+                    int8_t const newTxPower)
+{
+  spreadingFactor = newSpreadingFactor;
+  signalBandwidth = newSignalBandwidth;
+  frequencyChannel = newFrequencyChannel;
+  txPower = newTxPower;
 }

@@ -7,6 +7,29 @@
 // Function Definitions
 //----------------------
 
+void loraPoint2Point::updatePacketErrorFraction (bool packetSuccess)
+{
+  packetErrorFraction *= packetCount;
+  packetErrorFraction += (packetSuccess) ? 0 : 1;
+  packetErrorFraction /= ++packetCount;
+}
+
+void loraPoint2Point::resetPacketErrorFraction ()
+{
+  packetErrorFraction = 0;
+  packetCount = 0;
+}
+
+float const & loraPoint2Point::getPacketErrorFraction ()
+{
+  return packetErrorFraction;
+}
+
+int loraPoint2Point::getLastAckSNR ()
+{
+  return ackSnr;
+}
+
 spreadingFactor_t& operator++(spreadingFactor_t& s, int)
 {
   switch(s)
@@ -120,6 +143,26 @@ void loraPoint2Point::forceRadioReset ()
   delay(10);
 }
 
+spreadingFactor_t loraPoint2Point::getSpreadingfactor ()
+{
+  return currentSpreadingFactor;
+}
+
+signalBandwidth_t loraPoint2Point::getSignalBandwidth ()
+{
+  return currentSignalBandwidth;
+}
+
+frequencyChannel_t loraPoint2Point::getFrequencyChannel ()
+{
+  return currentFrequencyChannel;
+}
+
+int8_t loraPoint2Point::getTxPower ()
+{
+  return currentTxPower;
+}
+
 void loraPoint2Point::setSpreadingFactor (spreadingFactor_t spreadingFactor)
 {
   if (spreadingFactor >= NUM_spreadingFactors)
@@ -129,8 +172,13 @@ void loraPoint2Point::setSpreadingFactor (spreadingFactor_t spreadingFactor)
   uint8_t spreadingFactorToSet = spreadingFactorTable[spreadingFactor];
   rf95.setSpreadingFactor(spreadingFactorToSet);
   rf95.setModeIdle(); // Required to update radio settings.
+  resetPacketErrorFraction();
   previousSpreadingFactor = currentSpreadingFactor;
   currentSpreadingFactor = spreadingFactor;
+  user.linkChangeInd(currentSpreadingFactor,
+                     currentSignalBandwidth,
+                     currentFrequencyChannel,
+                     currentTxPower);
   Serial.print("Set SF to: ");
   Serial.println(spreadingFactorToSet);
 }
@@ -144,8 +192,13 @@ void loraPoint2Point::setBandwidth (signalBandwidth_t bandwidth)
   uint32_t bandwidthToSet = signalBandwidthTable[bandwidth];
   rf95.setSignalBandwidth(bandwidthToSet);
   rf95.setModeIdle(); // Required to update radio settings.
+  resetPacketErrorFraction();
   previousSignalBandwidth = currentSignalBandwidth;
   currentSignalBandwidth = bandwidth;
+  user.linkChangeInd(currentSpreadingFactor,
+                     currentSignalBandwidth,
+                     currentFrequencyChannel,
+                     currentTxPower);
   Serial.print("Set BW to: ");
   Serial.println(bandwidthToSet);
 }
@@ -165,8 +218,13 @@ void loraPoint2Point::setFrequencyChannel (frequencyChannel_t frequencyChannel)
   else
   {
     rf95.setModeIdle(); // Required to update radio settings.
+    resetPacketErrorFraction();
     previousFrequencyChannel = currentFrequencyChannel;
     currentFrequencyChannel = frequencyChannel;
+    user.linkChangeInd(currentSpreadingFactor,
+                     currentSignalBandwidth,
+                     currentFrequencyChannel,
+                     currentTxPower);
     Serial.print("Set Freq to: ");
     Serial.println(frequencyToSet);
   }
@@ -180,8 +238,13 @@ void loraPoint2Point::setTxPower (int8_t txPower)
   }
   rf95.setTxPower(txPower, false);
   rf95.setModeIdle(); // Required to update radio settings.
+  resetPacketErrorFraction();
   previousTxPower = currentTxPower;
   currentTxPower = txPower;
+  user.linkChangeInd(currentSpreadingFactor,
+                     currentSignalBandwidth,
+                     currentFrequencyChannel,
+                     currentTxPower);
   Serial.print("Set TX power to: ");
   Serial.println(txPower);
 }
@@ -441,8 +504,12 @@ void loraPoint2Point::serviceTx (uint8_t destAddress)
     if (rhReliableDatagram.sendtoWait(txMsg.buf, txMsg.bufLen, destAddress) == true)
     {
       Serial.println("Acknowleged!");
+      ackSnr = rf95.lastSNR();
+      Serial.print("ACK SNR: ");
+      Serial.println(rf95.lastSNR());
       acknowleged = true;
     }
+    updatePacketErrorFraction(acknowleged);
     if (acknowleged == false)
     {
       Serial.println("Not acknowleged.");
@@ -479,6 +546,8 @@ void loraPoint2Point::serviceRx ()
      )
   {
     user.rxInd(rxMsg);
+    Serial.print("RX SNR: ");
+    Serial.println(rf95.lastSNR());
     switch (rxMsg.buf[0])
     {
       case msgType_dataReq:

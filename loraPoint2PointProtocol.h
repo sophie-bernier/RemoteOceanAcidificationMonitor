@@ -14,9 +14,10 @@
 // you can set transmitter powers from 5 to 23 dBm:
 #define RFM95_DFLT_FREQ_CHANNEL     frequencyChannel_500kHz_Uplink_0
 #define RFM95_DFLT_SPREADING_FACTOR spreadingFactor_sf7 // spreadingFactor_sf8
-#define RFM95_DFLT_TX_POWER_dBm     15
+#define RFM95_DFLT_TX_POWER_dBm     1//5
 #define RFM95_DFLT_SIGNAL_BANDWIDTH signalBandwidth_500kHz // signalBandwidth_250kHz
 #define RH_RF95_MAX_MESSAGE_LEN 128
+#define MAX_txPower 20
 
 #define LINK_CHANGE_TIMEOUT_MILLIS 3000
 
@@ -34,15 +35,6 @@ struct message_t
   uint8_t flags;
   uint8_t bufLen;
   uint8_t buf [RH_RF95_MAX_MESSAGE_LEN];
-};
-
-struct userCallbacks_t
-{
-  void (*txInd) (uint8_t const * txBuf, 
-                 uint8_t const bufLen, 
-                 uint8_t const destAddr, 
-                 bool ack);
-  void (*rxInd) (message_t const & rxMsg);
 };
 
 enum eventType_t
@@ -127,7 +119,18 @@ enum frequencyChannel_t
 
 frequencyChannel_t& operator++(frequencyChannel_t& f, int);
 
-#define MAX_txPower 20
+struct userCallbacks_t
+{
+  void (*txInd) (uint8_t const * txBuf, 
+                 uint8_t const bufLen, 
+                 uint8_t const destAddr, 
+                 bool ack);
+  void (*rxInd) (message_t const & rxMsg);
+  void (*linkChangeInd) (spreadingFactor_t const newSpreadingFactor,
+                         signalBandwidth_t const newSignalBandwidth,
+                         frequencyChannel_t const newFrequencyChannel,
+                         int8_t const newTxPower);
+};
 
 //-----------------------
 // Class Declarations
@@ -152,6 +155,12 @@ class loraPoint2Point
                        }
     
     // Public functions
+    float const & getPacketErrorFraction ();
+    int getLastAckSNR ();
+    spreadingFactor_t  getSpreadingfactor   ();
+    signalBandwidth_t  getSignalBandwidth   ();
+    frequencyChannel_t getFrequencyChannel  ();
+    int8_t             getTxPower           ();
     bool setupRadio ();
     void setFrequencyChannel (frequencyChannel_t frequencyChannel);
     void setSpreadingFactor  (spreadingFactor_t spreadingFactor);
@@ -189,6 +198,7 @@ class loraPoint2Point
     //goToSleep ();
   private:
     // Private variables
+    int ackSnr = 0;
     bool serialCommandMode = false;
     uint8_t rfm95Rst = 4;
     uint8_t thisAddress = 0;
@@ -207,6 +217,9 @@ class loraPoint2Point
     const uint32_t signalBandwidthTable [NUM_signalBandwidths] = {125000, 250000, 500000, 625000};
     const uint16_t frequencyChannelTable [NUM_frequencyChannels] = {9030, 9046, 9062, 9078, 9094, 9110, 9126, 9142, 9233, 9239, 9245, 9251, 9257, 9263, 9269, 9275};
     uint32_t currentMillis = 0;
+    float packetErrorFraction = 0;
+    uint32_t packetCount = 0;
+
     
     // Private classes
     RH_RF95 rf95;
@@ -219,6 +232,8 @@ class loraPoint2Point
     // Private functions
     uint8_t buildStringFromSerialInner (char inputChar);
     void forceRadioReset ();
+    void linkChangeReqTimeout ();
+    void resetPacketErrorFraction ();
     void serviceDataReq (); // Server only
     void serviceDataRsp (); // Client only
     void serviceLinkChangeReq (uint8_t const            srcAddress,
@@ -227,8 +242,7 @@ class loraPoint2Point
                                frequencyChannel_t const frequencyChannel,
                                int8_t const             txPower);
     void serviceLinkChangeRsp ();
-    void linkChangeReqTimeout ();
-
+    void updatePacketErrorFraction (bool packetSuccess);
     
     // Callback functions
     userCallbacks_t user;

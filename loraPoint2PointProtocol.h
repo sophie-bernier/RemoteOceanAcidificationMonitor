@@ -30,9 +30,10 @@
 // you can set transmitter powers from 5 to 23 dBm:
 #define RFM95_DFLT_FREQ_CHANNEL     frequencyChannel_500kHz_Uplink_0
 #define RFM95_DFLT_SPREADING_FACTOR spreadingFactor_sf7 // spreadingFactor_sf8
-#define RFM95_DFLT_TX_POWER_dBm     1//5
+#define RFM95_DFLT_TX_POWER_dBm     2//5
 #define RFM95_DFLT_SIGNAL_BANDWIDTH signalBandwidth_500kHz // signalBandwidth_250kHz
 #define RH_RF95_MAX_MESSAGE_LEN 128
+#define MIN_txPower 2
 #define MAX_txPower 20
 
 #define LINK_CHANGE_TIMEOUT_MILLIS 3000
@@ -144,7 +145,6 @@ enum signalBandwidth_t
   signalBandwidth_125kHz,
   signalBandwidth_250kHz,
   signalBandwidth_500kHz,
-  signalBandwidth_625kHz,
   NUM_signalBandwidths
 };
 
@@ -506,7 +506,7 @@ class loraPoint2Point
     message_t rxMsg = {0, 0, 0, 0, RH_RF95_MAX_MESSAGE_LEN};
     message_t serialCmd = {0, 0, 0, 0, 0};
     const uint8_t spreadingFactorTable [NUM_spreadingFactors] = {7, 8, 9, 10, 11, 12};
-    const uint32_t signalBandwidthTable [NUM_signalBandwidths] = {125000, 250000, 500000, 625000};
+    const uint32_t signalBandwidthTable [NUM_signalBandwidths] = {125000, 250000, 500000};
     const uint16_t frequencyChannelTable [NUM_frequencyChannels] = {9030, 9046, 9062, 9078, 9094, 9110, 9126, 9142, 9233, 9239, 9245, 9251, 9257, 9263, 9269, 9275};
     uint32_t currentMillis = 0;
     float packetErrorFraction = 0;

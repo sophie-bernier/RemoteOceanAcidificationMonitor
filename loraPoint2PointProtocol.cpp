@@ -67,8 +67,6 @@ signalBandwidth_t& operator++(signalBandwidth_t& b, int)
     case signalBandwidth_t::signalBandwidth_250kHz:
       return b = signalBandwidth_t::signalBandwidth_500kHz;
     case signalBandwidth_t::signalBandwidth_500kHz:
-    //  return b = signalBandwidth_t::signalBandwidth_625kHz;
-    //case signalBandwidth_t::signalBandwidth_625kHz:
       return b = signalBandwidth_t::signalBandwidth_125kHz;
   }
 }
@@ -250,7 +248,7 @@ void loraPoint2Point::setFrequencyChannel (frequencyChannel_t frequencyChannel)
 
 void loraPoint2Point::setTxPower (int8_t txPower)
 {
-  if ((txPower > 20) | (txPower < 2))
+  if ((txPower > MAX_txPower) | (txPower < MIN_txPower))
   {
     Serial.print("Invalid tx power setting (");
     Serial.print(txPower);

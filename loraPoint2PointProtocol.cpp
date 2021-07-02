@@ -176,7 +176,10 @@ void loraPoint2Point::setSpreadingFactor (spreadingFactor_t spreadingFactor)
 {
   if (spreadingFactor >= NUM_spreadingFactors)
   {
-    spreadingFactor = RFM95_DFLT_SPREADING_FACTOR;
+    Serial.print("Invalid spreading factor setting (");
+    Serial.print(spreadingFactor);
+    Serial.println(")");
+    return;
   }
   uint8_t spreadingFactorToSet = spreadingFactorTable[spreadingFactor];
   rf95.setSpreadingFactor(spreadingFactorToSet);
@@ -196,7 +199,10 @@ void loraPoint2Point::setBandwidth (signalBandwidth_t bandwidth)
 {
   if (bandwidth >= NUM_signalBandwidths)
   {
-    bandwidth = RFM95_DFLT_SIGNAL_BANDWIDTH;
+    Serial.print("Invalid signal bandwidth setting (");
+    Serial.print(bandwidth);
+    Serial.println(")");
+    return;
   }
   uint32_t bandwidthToSet = signalBandwidthTable[bandwidth];
   rf95.setSignalBandwidth(bandwidthToSet);
@@ -216,7 +222,10 @@ void loraPoint2Point::setFrequencyChannel (frequencyChannel_t frequencyChannel)
 {
   if (frequencyChannel >= NUM_frequencyChannels)
   {
-    frequencyChannel = RFM95_DFLT_FREQ_CHANNEL;
+    Serial.print("Invalid frequency channel setting (");
+    Serial.print(frequencyChannel);
+    Serial.println(")");
+    return;
   }
   float frequencyToSet = ((float)(frequencyChannelTable[frequencyChannel]))/10;
   if (!rf95.setFrequency(frequencyToSet))
@@ -243,7 +252,10 @@ void loraPoint2Point::setTxPower (int8_t txPower)
 {
   if ((txPower > 20) | (txPower < 2))
   {
-    txPower = RFM95_DFLT_TX_POWER_dBm;
+    Serial.print("Invalid tx power setting (");
+    Serial.print(txPower);
+    Serial.println("dBm)");
+    return;
   }
   rf95.setTxPower(txPower, false);
   rf95.setModeIdle(); // Required to update radio settings.

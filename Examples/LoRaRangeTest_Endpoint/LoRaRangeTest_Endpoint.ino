@@ -26,12 +26,18 @@ void txInd (uint8_t const * txBuf,
 {}
 void rxInd (message_t const & rxMsg)
 {}
+void linkChangeInd (spreadingFactor_t const newSpreadingFactor,
+                    signalBandwidth_t const newSignalBandwidth,
+                    frequencyChannel_t const newFrequencyChannel,
+                    int8_t const newTxPower)
+{}
+
 
 //---------
 // Classes
 //---------
 
-userCallbacks_t callbacks = {txInd, rxInd};
+userCallbacks_t callbacks = {txInd, rxInd, linkChangeInd};
 
 loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
                             RFM95_CS,

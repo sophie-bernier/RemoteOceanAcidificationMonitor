@@ -83,10 +83,11 @@ void processButtons ();
 void setup()
 {
   Serial.begin(USB_SERIAL_BAUD);
-  //while (!Serial)
-  //{
-  //  delay(1);
-  //}
+  while (!Serial)
+  {
+    delay(1);
+  }
+  Serial.println("Hello World!");
   
   digitalWrite(10, HIGH); // tie SD high
 
@@ -305,7 +306,7 @@ void loop()
           txPower++;
           if (txPower > MAX_txPower)
           {
-            txPower = 1;
+            txPower = MIN_txPower;
           }
           break;
       }

@@ -1,4 +1,13 @@
-// loraPoint2PointProtocol.cpp
+/**
+ * @file loraPoint2PointProtocol.cpp
+ * @author Sophie Bernier (raptoronabicycle@gmail.com)
+ * @brief Implementation file for the loraPoint2Point class and its dependent enums' operators, et cetera.
+ * @version 0.0.1
+ * @date 2021-06-29
+ * 
+ * @warning Under heavy development. Use at your own risk.
+ * 
+ */
 
 #include <Arduino.h>
 #include <loraPoint2PointProtocol.h>
@@ -360,7 +369,6 @@ uint8_t loraPoint2Point::buildStringFromSerialInner (char inputChar)
   }
 }
 
-// Todo: smarter way of doing this.
 uint8_t loraPoint2Point::setTxMessage (uint8_t const * txMsgContents, uint8_t const numChars)
 {
   txMsg.buf[0] = msgType_dataReq;

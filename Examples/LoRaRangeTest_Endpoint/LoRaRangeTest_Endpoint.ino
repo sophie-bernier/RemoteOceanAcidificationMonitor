@@ -26,12 +26,18 @@ void txInd (uint8_t const * txBuf,
 {}
 void rxInd (message_t const & rxMsg)
 {}
+void linkChangeInd (spreadingFactor_t const newSpreadingFactor,
+                    signalBandwidth_t const newSignalBandwidth,
+                    frequencyChannel_t const newFrequencyChannel,
+                    int8_t const newTxPower)
+{}
+
 
 //---------
 // Classes
 //---------
 
-userCallbacks_t callbacks = {txInd, rxInd};
+userCallbacks_t callbacks = {txInd, rxInd, linkChangeInd};
 
 loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
                             RFM95_CS,
@@ -76,7 +82,7 @@ void loop()
     point2point.serviceTx(0xBB);
   }
 
-  /*
+  /*  
   if 
      //(false)
      ((currentMillis - prevLinkChangeMillis) > 21010)
@@ -88,7 +94,7 @@ void loop()
     {
     case 0:
       //spreadingFactor = spreadingFactor_sf8;
-      //point2point.setSpreadingFactor(spreadingFactor_sf8);
+      point2point.setSpreadingFactor(spreadingFactor_sf8);
       varToIncrement++;
       break;
     case 1:
@@ -111,7 +117,6 @@ void loop()
     }
   }
   */
-  
   point2point.serviceRx();
 }
 

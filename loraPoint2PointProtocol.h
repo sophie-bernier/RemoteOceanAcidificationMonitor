@@ -238,6 +238,13 @@ struct userCallbacks_t
  *  |<-Response(Rsp)-|    |--Confirmation(Cnf)->|
  *  |------Ack------>|    |<--------Ack---------|
  *  V                V    V                     V
+ *
+ * Client       Server   Client             Server
+ * (Base)      (Sensor)  (Base)            (Sensor)
+ *  |                |    |                      |
+ *  |--Command(Cmd)->|    |<-Notification(Notif)-|
+ *  |<-----Ack-------|    |----------Ack-------->|
+ *  V                V    V                      V
  * 
  * @todo Support regions other than US915.
  * @todo Clean up class and put all members in alpabetical order.

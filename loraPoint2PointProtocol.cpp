@@ -325,7 +325,14 @@ uint8_t loraPoint2Point::buildStringFromSerialInner (char inputChar)
             setBandwidth(signalBandwidth_t(serialCmd.buf[1] - '0'));
             break;
           case 'C':
-            setFrequencyChannel(frequencyChannel_t(serialCmd.buf[1] - '0'));
+            if (serialCmd.bufLen == 2)
+            {
+              setFrequencyChannel(frequencyChannel_t(serialCmd.buf[1] - '0'));
+            }
+            else
+            {
+              setFrequencyChannel(frequencyChannel_t((serialCmd.buf[1] - '0') * 10 + (serialCmd.buf[2] - '0')));
+            }
             break;
           case 'P':
             if (serialCmd.bufLen == 2)

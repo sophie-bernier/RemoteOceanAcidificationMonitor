@@ -65,7 +65,7 @@ loraPoint2Point point2point(RH_RELIABLE_DATAGRAM_ADDR,
                             callbacks);
 Adafruit_SSD1306 display = Adafruit_SSD1306(128, 32, &Wire);
 File dataFile;
-String dataFileName = "datalog.txt";
+String dataFileName = "datalog.csv";
 String dataFileHeader = "Timestamp,Source Address,Destination Address,Message ID,Message Flags,Acknowleged,Message,spreadingFactor,signalBandwidth,frequencyChannel,txPower";
 
 //-----------------
@@ -444,8 +444,16 @@ void txInd (uint8_t const * txBuf,
     dataFile.print(RH_RELIABLE_DATAGRAM_ADDR, HEX);
     dataFile.print(",");
     dataFile.print(destAddr, HEX);
-    dataFile.print(",,,");
+    dataFile.print(",");
+    dataFile.print((int)(txBuf[0]));
+    dataFile.print(",");
+    dataFile.print(",");
     dataFile.print(ack);
+    dataFile.print(",");
+    for (uint8_t i = 1; i < bufLen; i++)
+    {
+      dataFile.print(char(txBuf[i]));
+    }
     dataFile.print(",");
     dataFile.print(spreadingFactor);
     dataFile.print(",");
@@ -454,10 +462,6 @@ void txInd (uint8_t const * txBuf,
     dataFile.print(frequencyChannel);
     dataFile.print(",");
     dataFile.print(txPower);
-    for (uint8_t i = 0; i < bufLen; i++)
-    {
-      dataFile.print(char(txBuf[i]));
-    }
     dataFile.println();
     Serial.println("TX data written to SD card.");
   }
@@ -507,14 +511,24 @@ void rxInd (message_t const & rxMsg)
     dataFile.print(",");
     dataFile.print(rxMsg.destAddr, HEX);
     dataFile.print(",");
-    dataFile.print(rxMsg.msgId);
+    dataFile.print(int(rxMsg.buf[0]));
     dataFile.print(",");
-    dataFile.print(rxMsg.flags);
-    dataFile.print(",,");
-    for (uint8_t i = 0; i < rxMsg.bufLen; i++)
+    dataFile.print(int(rxMsg.flags));
+    dataFile.print(",");
+    dataFile.print('1');
+    dataFile.print(",");
+    for (uint8_t i = 1; i < rxMsg.bufLen; i++)
     {
       dataFile.print(char(rxMsg.buf[i]));
     }
+    dataFile.print(",");
+    dataFile.print(spreadingFactor);
+    dataFile.print(",");
+    dataFile.print(signalBandwidth);
+    dataFile.print(",");
+    dataFile.print(frequencyChannel);
+    dataFile.print(",");
+    dataFile.print(txPower);
     dataFile.println();
     Serial.println("RX data written to SD card.");
   }

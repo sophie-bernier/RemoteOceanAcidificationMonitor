@@ -30,6 +30,22 @@
 
 #include <proO.h>
 
+enum state_t
+{
+  state_asleep,
+  state_idle,
+  state_menu,
+  state_viewLoggedData
+};
+
+enum command_t
+{
+  command_none,
+  command_wakeup,
+  command_startViewingLoggedData,
+  command_stopViewingLoggedData
+};
+
 // Note. Times out after 60s of inactivity.
 
 uint8_t started = 0;
@@ -39,77 +55,49 @@ uint32_t lastRXMillis = 0;
 uint32_t firstStartMillis = 0;
 uint32_t currentRXMillis = 0;
 String rxBuffer;
+String txBuffer;
 ProCVData Data;
-nextCommand_t nextCommand = nextCommand_none;
-expecting_t expecting = expecting_undefined;
-bool viewingLoggedData;
+command_t command = command_wakeup;
+state_t state = state_asleep;
+bool newRx = false;
 
-void setup() {
+void sendEsc ()
+{
+  Serial.println("DBG: Sending 'ESC'");
+  Serial1.write(27);
+  lastTXMillis = millis();
+}
+
+void setup()
+{
   Serial.begin(19200);
   while (!Serial);
   Serial1.begin(19200);
   while (!Serial1);
 }
 
-void loop() {
+void loop()
+{
   currentMillis = millis();
-  if (started == 0)
-  {
-    Serial.println("DBG: Sending 'ESC' 1");
-    Serial1.write(27);
-    lastTXMillis = millis();
-    expecting = expecting_undefined;
-    started = 1;
-  }
-  else if ((started == 1) && (currentMillis - lastTXMillis > 1000))
-  {
-    Serial.println("DBG: Sending 'ESC' 2");
-    Serial1.write(27);
-    lastTXMillis = millis();
-    expecting = expecting_undefined;
-    firstStartMillis = lastTXMillis;
-    started = 2;
-  }
-  else if ((started == 2) && (currentMillis - lastTXMillis > 1000))
-  {
-    switch (nextCommand)
-    {
-      case nextCommand_startViewingLoggedData:
-        Serial1.print("4\r");
-        lastTXMillis = millis();
-        expecting = expecting_loggedData;
-        nextCommand = nextCommand_none;
-        break;
-      default:
-        break;
-    }
-  }
-  if ((currentMillis - lastTXMillis > 60000) && (viewingLoggedData == false))
-  {
-    started = 0; // restart before timeout.
-  }
 
-  if ((currentMillis - firstStartMillis > 10000) && (viewingLoggedData == false))
-  {
-    nextCommand = nextCommand_startViewingLoggedData;
-    viewingLoggedData = true;
-  }
-
-  if ((currentMillis - lastTXMillis > 20000) && (viewingLoggedData == true))
-  {
-    started = 1; // exit viewing logged data.
-    viewingLoggedData = false;
-  }
-  
   if (Serial.available()) 
   {      // If anything comes in Serial (USB),
-    Serial1.write(Serial.read());   // read it and send it out Serial1 (pins 0 & 1)
+    txBuffer = Serial.readStringUntil('\n');
+    if ((txBuffer[0] = '0') && (txBuffer[1] = 'd'))
+    {
+      Serial.write(txBuffer.substring(2).toInt());
+    }
+    else
+    {
+      Serial1.print(txBuffer);   // read it and send it out Serial1 (pins 0 & 1)
+    }
   }
 
   if (Serial1.available()) 
   {     // If anything comes in Serial1 (pins 0 & 1)
     rxBuffer = Serial1.readStringUntil('\n');
     currentRXMillis = millis();
+    newRx = true;
     Serial.println(rxBuffer);
     Serial.print("DBG: ");
     Serial.print(currentRXMillis - lastRXMillis);
@@ -117,16 +105,69 @@ void loop() {
     Serial.print(currentRXMillis - lastTXMillis);
     Serial.println("ms since TX");
     lastRXMillis = currentRXMillis;
+  }
 
-    switch (expecting)
-    {
-      case expecting_loggedData:
+  switch (state)
+  {
+    case state_asleep:
+      switch (command)
+      {
+        case command_wakeup:
+          sendEsc();
+          state = state_idle;
+          command = command_none;
+      }
+      break;
+    case state_idle:
+      if (currentMillis - lastTXMillis > 1000) // time for status to show
+      {
+        sendEsc();
+        state = state_menu;
+      }
+      break;
+    case state_menu:
+      if (currentMillis - lastTXMillis > 1000) // time for menu to show
+      {
+        switch (command)
+        {
+          case command_startViewingLoggedData:
+            Serial1.print("4\r");
+            lastTXMillis = millis();
+            state = state_viewLoggedData;
+            command = command_none;
+        }
+      }
+      if (currentMillis - lastTXMillis > 10000) // debug - start viewing data after a while
+      {
+        command = command_startViewingLoggedData;
+      }
+      if (currentMillis - lastTXMillis > 60000)
+      {
+        state = state_asleep;
+        command = command_wakeup;
+      }
+      break;
+    case state_viewLoggedData:
+      if (newRx)
+      {
         Data.setDataFromString(rxBuffer);
         // Data.printAllData(Serial);
-        break;
-      default:
-        break;
-    }
-    //Serial.write(Serial1.read());   // read it and send it out Serial (USB)
+      }
+      if (currentMillis - lastTXMillis > 20000) // debug - stop viewing data after a while
+      {
+        command = command_stopViewingLoggedData;
+      }
+      if (currentMillis - lastRXMillis > 1000) // accept new commands as sensor returns to menu  when reading is done
+      {
+        state = state_menu;
+      }
+      switch (command)
+      {
+        case command_stopViewingLoggedData:
+          state = state_idle; // send esc and return to main menu
+      }
+      break;
+    default:
+      break;
   }
 }

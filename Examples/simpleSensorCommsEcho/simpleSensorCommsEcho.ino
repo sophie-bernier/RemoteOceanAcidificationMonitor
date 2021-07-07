@@ -28,8 +28,21 @@
   by Sophie Bernier
 */
 
+#include <proO.h>
+
+// Note. Times out after 60s of inactivity.
+
 uint8_t started = 0;
 uint32_t currentMillis = 0;
+uint32_t lastTXMillis = 0;
+uint32_t lastRXMillis = 0;
+uint32_t firstStartMillis = 0;
+uint32_t currentRXMillis = 0;
+String rxBuffer;
+ProCVData Data;
+nextCommand_t nextCommand = nextCommand_none;
+expecting_t expecting = expecting_undefined;
+bool viewingLoggedData;
 
 void setup() {
   Serial.begin(19200);
@@ -39,19 +52,55 @@ void setup() {
 }
 
 void loop() {
+  currentMillis = millis();
   if (started == 0)
   {
-    Serial.print("DBG: Sending 'ESC' 1");
+    Serial.println("DBG: Sending 'ESC' 1");
     Serial1.write(27);
-    currentMillis = millis();
+    lastTXMillis = millis();
+    expecting = expecting_undefined;
     started = 1;
   }
-  else if ((started == 1) && (millis() > currentMillis + 1000))
+  else if ((started == 1) && (currentMillis - lastTXMillis > 1000))
   {
-    Serial.print("DBG: Sending 'ESC' 2");
+    Serial.println("DBG: Sending 'ESC' 2");
     Serial1.write(27);
+    lastTXMillis = millis();
+    expecting = expecting_undefined;
+    firstStartMillis = lastTXMillis;
     started = 2;
   }
+  else if ((started == 2) && (currentMillis - lastTXMillis > 1000))
+  {
+    switch (nextCommand)
+    {
+      case nextCommand_startViewingLoggedData:
+        Serial1.print("4\r");
+        lastTXMillis = millis();
+        expecting = expecting_loggedData;
+        nextCommand = nextCommand_none;
+        break;
+      default:
+        break;
+    }
+  }
+  if ((currentMillis - lastTXMillis > 60000) && (viewingLoggedData == false))
+  {
+    started = 0; // restart before timeout.
+  }
+
+  if ((currentMillis - firstStartMillis > 10000) && (viewingLoggedData == false))
+  {
+    nextCommand = nextCommand_startViewingLoggedData;
+    viewingLoggedData = true;
+  }
+
+  if ((currentMillis - lastTXMillis > 20000) && (viewingLoggedData == true))
+  {
+    started = 1; // exit viewing logged data.
+    viewingLoggedData = false;
+  }
+  
   if (Serial.available()) 
   {      // If anything comes in Serial (USB),
     Serial1.write(Serial.read());   // read it and send it out Serial1 (pins 0 & 1)
@@ -59,6 +108,25 @@ void loop() {
 
   if (Serial1.available()) 
   {     // If anything comes in Serial1 (pins 0 & 1)
-    Serial.write(Serial1.read());   // read it and send it out Serial (USB)
+    rxBuffer = Serial1.readStringUntil('\n');
+    currentRXMillis = millis();
+    Serial.println(rxBuffer);
+    Serial.print("DBG: ");
+    Serial.print(currentRXMillis - lastRXMillis);
+    Serial.print("ms since RX, ");
+    Serial.print(currentRXMillis - lastTXMillis);
+    Serial.println("ms since TX");
+    lastRXMillis = currentRXMillis;
+
+    switch (expecting)
+    {
+      case expecting_loggedData:
+        Data.setDataFromString(rxBuffer);
+        // Data.printAllData(Serial);
+        break;
+      default:
+        break;
+    }
+    //Serial.write(Serial1.read());   // read it and send it out Serial (USB)
   }
 }

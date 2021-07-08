@@ -9,6 +9,9 @@
  * 
  */
 
+#ifndef PRO_O_H
+#define PRO_O_H
+
 #include <Arduino.h>
 #include <SimpleTimer.h>
 
@@ -85,17 +88,22 @@ enum dataField_t
 #define BITS_SUPPLY_VOLTS_INT 4
 #define BITS_SUPPLY_VOLTS_FRAC 4
 
-enum nextCommand_t
+enum state_t
 {
-  nextCommand_none,
-  nextCommand_startViewingLoggedData
+  state_asleep,
+  state_idle,
+  state_menu,
+  state_viewLoggedData
 };
 
-enum expecting_t
+enum command_t
 {
-  expecting_undefined,
-  expecting_loggedData,
-  NUM_expecting
+  command_none,
+  command_wakeup,
+  command_startViewingLoggedData,
+  command_stopViewingLoggedData,
+  command_startLoggingData,
+  command_stopLoggingData
 };
 
 struct ProCVDataBitfield
@@ -187,18 +195,20 @@ class ProCV
     uint16_t supplyMilliVolts;
     uint16_t baudRate;
     sampleMode_t sampleMode; 
+    uint8_t started = 0;
     uint32_t currentMillis = 0;
-    simpleTimer commandDelayTimer = simpleTimer(1000,
-                                                currentMillis,
-                                                false);
-    uint16_t escCount = 0;
-    nextCommand_t nextCommand = nextCommand_none;
-    expecting_t expecting = expecting_undefined;
-    String inputBuffer;
+    uint32_t lastTXMillis = 0;
+    uint32_t lastRXMillis = 0;
+    uint32_t firstStartMillis = 0;
+    uint32_t currentRXMillis = 0;
+    String rxBuffer;
+    String txBuffer;
+    ProCVData Data;
+    command_t command = command_wakeup;
+    state_t state = state_asleep;
+    bool newRx = false;
 
     void sendEsc ();
-    void echoFromSerial ();
-    void purgeSerial ();
   protected:
   public:
     /**
@@ -213,13 +223,11 @@ class ProCV
      * @brief Check for incoming data from the sensor on the serial port. Run this often in the main loop to ensure that serial messages are not missed and that the serial buffer does not overflow!
      * 
      */
-    void serviceSerial ();
+    void serviceSensorSerial ();
 
     /**
-     * @brief Initializes sensor by sending two 'ESC' (0x1b) characters.
+     * @brief Wakes sensor UI by sending two 'ESC' (0x1b) characters.
      * 
-     * @return true  Sensor started successfully.
-     * @return false Sensor startup failed.
      * Entering y/n values just requires entering a 'y' or a 'n' character sometimes, but it doesn't hurt to enter an '\r' (0x0d) character after.
      * Entering a numerical value requires entering an '\r' (0x0d) character after the number.
      * Expect from sensor (after every command):
@@ -243,7 +251,7 @@ class ProCV
       Stopping user interface
        @endverbatim
      */
-    bool startSensor ();
+    void wakeSensor ();
 
     /**
      * @brief Starts sampling in currently set mode.
@@ -259,20 +267,17 @@ class ProCV
      * ...
      *
      */
-    bool startSampling ();
+    void startSampling ();
 
     /**
      * @brief Stops sampling.
-     * 
-     * @return true  Sampling stopped successfully.
-     * @return false Sampling not stopped.
      * 
      * Expect from sensor: 
      * @verbatim
       Stopping sampling
        @endverbatim
      */
-    bool stopSampling ();
+    void stopSampling ();
 
     /**
      * @brief Sets the sensor to sample as often as it can (every few seconds).
@@ -280,8 +285,6 @@ class ProCV
      * @param samplesToSkip     Number of continuous mode samples skipped between log entries. Defaults to 0.
      * @param clearZeroCount    Clear the zero count if true. Used only to clear the zero count when replacing the CO2 absorbent. Defaults to false.
      * @param zeroIntervalHours Sets number of hours between zero point corrections (1 to 24h). Defaults to 2h.
-     * @return true  Continuous sample mode set successfully.
-     * @return false Sensor not set to continuous sample mode.
      * 
      * On entering '3' from main menu, expect:
      * @verbatim
@@ -346,7 +349,7 @@ class ProCV
       >>
        @endverbatim
      */
-    bool setSampleModeContinuous (uint16_t samplesToSkip     = 0,
+    void setSampleModeContinuous (uint16_t samplesToSkip     = 0,
                                   bool     clearZeroCount    = false,
                                   uint8_t  zeroIntervalHours = 2);
     
@@ -372,10 +375,8 @@ class ProCV
      *                           Defaults to false.
      * @param zeroIntervalHours  Sets number of hours between zero point
      *                           corrections (1 to 24h). Defaults to 2h.
-     * @return true  Timed sample mode set successfully.
-     * @return false Sensor not set to timed sample mode.
      */
-    bool setSampleModeTimed (uint16_t sampleIntervalMins = 30,
+    void setSampleModeTimed (uint16_t sampleIntervalMins = 30,
                              uint8_t  readingsPerSample  = 10,
                              uint8_t  firstSampleHour    = 0,
                              uint8_t  firstSampleMin     = 0,
@@ -398,21 +399,17 @@ class ProCV
      *                          Defaults to false.
      * @param zeroIntervalHours Sets number of hours between zero point
      *                          corrections (1 to 24h). Defaults to 2h.
-     * @return true  Command sample mode set successfully.
-     * @return false Sensor not set to timed sample mode.
      */ 
-    bool setSampleModeCommand (uint8_t  readingsPerSample,
-                                  bool     logAverage,
-                                  bool     clearZeroCount,
-                                  uint8_t  zeroIntervalHours);
+    void setSampleModeCommand (uint8_t  readingsPerSample,
+                               bool     logAverage,
+                               bool     clearZeroCount,
+                               uint8_t  zeroIntervalHours);
     
     /**
      * @brief Triger a sample manually. Sensor must be in sample mode.
      * 
-     * @return true  Sample taken successfully.
-     * @return false Sample not taken.
      */
-    bool commandModeSample ();
+    void commandModeSample ();
 
     /**
      * @brief View the data logged on the sensor.
@@ -427,7 +424,7 @@ class ProCV
      * @return true  Logged data viewing started successfully.
      * @return false Logged data viewing not started.
      */
-    bool startViewingLoggedData ();
+    void startViewingLoggedData ();
     
     /**
      * @brief Stop viewing the data logged on the sensor.
@@ -438,10 +435,8 @@ class ProCV
     /**
      * @brief Erases data logged on the sensor.
      * 
-     * @return true  Data erased successfully.
-     * @return false Data not erased.
      */
-    bool eraseLoggedData ();
+    void eraseLoggedData ();
     
     /**
      * @brief Update the status variables.
@@ -471,7 +466,7 @@ class ProCV
       *******************************************************************************************
        @endverbatim
      */
-    bool getStatus ();
+    void getStatus ();
 
     /**
      * @brief Set the sensor's internal clock time, used to timestamp data samples.
@@ -479,24 +474,20 @@ class ProCV
      * @return true  Clock time updated successfully.
      * @return false Clock time not updated.
      */
-    bool setClockTime ();
+    void setClockTime ();
     
     /**
      * @brief Set the baud rate used to communicate with the sensor.
      * 
      * @param baudRate Desired baud rate. Default is 19200.
-     * @return true  Baud rate updated successfully.
-     * @return false Baud rate not updated.
      */
-    bool setBaudRate (uint16_t baudRate = 19200);
+    void setBaudRate (uint16_t baudRate = 19200);
 
     /**
      * @brief Restore sensor settings to factory defaults.
      * 
-     * @return true Sensor settings returned to factory default successfully.
-     * @return false Sensor settings not returned to factory default.
      */
-    bool restoreFactoryDefault ();
+    void restoreFactoryDefault ();
 
     /**
      * @brief Schedule a zero CO2 measurement on the next sample.
@@ -506,3 +497,5 @@ class ProCV
      */
     void scheduleZero (); 
 };
+
+#endif // PRO_O_H

@@ -18,6 +18,7 @@
 
 #ifndef LORA_POINT_2_POINT_PROTOCOL_H
 #define LORA_POINT_2_POINT_PROTOCOL_H
+
 #include <Arduino.h>
 //#include <list.h>
 #include <simpleTimer.h>

@@ -9,6 +9,9 @@
  * 
  */
 
+#ifndef SIMPLE_TIMER_H
+#define SIMPLE_TIMER_H
+
 #include <Arduino.h>
 
 /**
@@ -178,3 +181,5 @@ class simpleTimerService
     std::list<simpleTimer*> simpleTimerList;
 };
 */
+
+#endif // SIMPLE_TIMER_H

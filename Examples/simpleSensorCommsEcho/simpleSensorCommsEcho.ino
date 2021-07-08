@@ -112,6 +112,9 @@ void loop()
     case state_asleep:
       switch (command)
       {
+        case command_startViewingLoggedData:
+          sendEsc();
+          state = state_idle;
         case command_wakeup:
           sendEsc();
           state = state_idle;

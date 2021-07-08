@@ -215,87 +215,122 @@ String ProCVData::getValueFromDataString (String const & DataString, bool resetI
 // ProCV
 //-------
 
-//------------------
-// Public Functions
-//------------------
-
-/*
-void ProCV::echoFromSerial ()
-{
-  if (dataPort.available())
-  {
-    Serial.print(dataPort.read());
-  }
-}
-
-void ProCV::purgeSerial ()
-{
-  if (dataPort.available())
-  {
-    dataPort.read();
-  }
-}
+//-------------------
+// Private Functions
+//-------------------
 
 void ProCV::sendEsc ()
 {
-  dataPort.print(ESC);
-  escCount++;
-  expecting = expecting_undefined;
-  commandDelayTimer.pause();
-  commandDelayTimer.clearDone();
-  commandDelayTimer.update();
-  commandDelayTimer.start();
+  Serial.println("DBG: Sending 'ESC'");
+  Serial1.write(27);
+  lastTXMillis = millis();
 }
+
+//------------------
+// Public Functions
+//------------------k
+
 
 void ProCV::serviceSerial ()
 {
-  currentMillis = millis();
-  if (dataPort.available())
+  if (dataPort.available()) 
   {
-    commandDelayTimer.reset();
+    rxBuffer = dataPort.readStringUntil('\n');
+    currentRXMillis = millis();
+    newRx = true;
+    Serial.println(rxBuffer);
+    Serial.print("DBG: ");
+    Serial.print(currentRXMillis - lastRXMillis);
+    Serial.print("ms since RX, ");
+    Serial.print(currentRXMillis - lastTXMillis);
+    Serial.println("ms since TX");
+    lastRXMillis = currentRXMillis;
   }
-  commandDelayTimer.update();
-  switch (expecting) // what to do with incoming info.
+
+  switch (state)
   {
-    case expecting_loggedData:
-      Data.setDataFromString(dataPort.readStringUntil('\n'));
-      Data.printAllData(Serial);
+    case state_asleep:
+      switch (command)
+      {
+        case command_startViewingLoggedData:
+          sendEsc();
+          state = state_idle;
+        case command_wakeup:
+          sendEsc();
+          state = state_idle;
+          command = command_none;
+      }
+      break;
+    case state_idle:
+      if (currentMillis - lastTXMillis > 1000) // time for status to show
+      {
+        sendEsc();
+        state = state_menu;
+      }
+      break;
+    case state_menu:
+      if (currentMillis - lastTXMillis > 1000) // time for menu to show
+      {
+        switch (command)
+        {
+          case command_startViewingLoggedData:
+            dataPort.print("4\r");
+            lastTXMillis = millis();
+            state = state_viewLoggedData;
+            command = command_none;
+        }
+      }
+      /*
+      if (currentMillis - lastTXMillis > 10000) // debug - start viewing data after a while
+      {
+        command = command_startViewingLoggedData;
+      }
+      */
+      if (currentMillis - lastTXMillis > 60000)
+      {
+        state = state_asleep;
+        //command = command_wakeup; debug - wake as soon as it goes to sleep
+      }
+
+      break;
+    case state_viewLoggedData:
+      if (newRx)
+      {
+        dataPort.setDataFromString(rxBuffer);
+        // Data.printAllData(Serial);
+      }
+      /*
+      if (currentMillis - lastTXMillis > 20000) // debug - stop viewing data after a while
+      {
+        command = command_stopViewingLoggedData;
+      }
+      */
+      if (currentMillis - lastRXMillis > 1000) // accept new commands as sensor returns to menu  when reading is done
+      {
+        state = state_menu;
+      }
+      switch (command)
+      {
+        case command_stopViewingLoggedData:
+          state = state_idle; // send esc and return to main menu
+      }
       break;
     default:
-      echoFromSerial();
       break;
-  }
-  if (commandDelayTimer.isDone()) // what to put out
-  {
-    switch (escCount)
-    {
-      case 0:
-      case 1:
-        sendEsc();
-        break;
-      default:
-        switch (nextCommand) // what to do next
-        {
-          case nextCommand_startViewingLoggedData:
-            dataPort.print("4\r");
-            expecting = expecting_loggedData;
-            nextCommand = nextCommand_none;
-            break;
-          default:
-            break;
-        }
-    }
   }
 }
 
-bool ProCV::startViewingLoggedData ()
+void ProCV::startViewingLoggedData ()
 {
-  sendEsc();
-  nextCommand = nextCommand_startViewingLoggedData;
+  command = command_startViewingLoggedData;
 }
 
 void ProCV::stopViewingLoggedData ()
 {
-  sendEsc();
+  command = command_stopViewingLoggedData;
 }
-*/
+
+void wakeSensor ()
+{
+  command = command_wakeup;
+}

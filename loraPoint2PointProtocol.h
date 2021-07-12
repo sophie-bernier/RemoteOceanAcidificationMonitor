@@ -518,6 +518,7 @@ class loraPoint2Point
     uint32_t currentMillis = 0;
     float packetErrorFraction = 0;
     uint32_t packetCount = 0;
+    uint32_t packetErrorCount = 0;
 
     //-----------------
     // Private classes

@@ -18,21 +18,24 @@
 
 void loraPoint2Point::updatePacketErrorFraction (bool packetSuccess)
 {
-  packetErrorFraction *= packetCount;
-  packetErrorFraction += (packetSuccess) ? 0 : 1;
-  packetErrorFraction /= ++packetCount;
+  ++packetCount;
+  packetErrorCount += (packetSuccess) ? 0 : 1;
+  packetErrorFraction = packetErrorCount / packetCount;
 }
 
 void loraPoint2Point::resetPacketErrorFraction ()
 {
   packetErrorFraction = 0;
   packetCount = 0;
+  packetErrorCount = 0;
 }
 
 float const & loraPoint2Point::getPacketErrorFraction ()
 {
   return packetErrorFraction;
 }
+
+
 
 int loraPoint2Point::getLastAckSNR ()
 {

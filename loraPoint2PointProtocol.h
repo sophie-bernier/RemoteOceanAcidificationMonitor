@@ -40,6 +40,13 @@
 
 #define USE_RH_RELIABLE_DATAGRAM true
 
+//--------
+// Macros
+//--------
+
+#define MIN(a, b) (((a) > (b)) ? (b) : (a))
+#define MAX(a, b) (((a) < (b)) ? (b) : (a))
+
 //-----------------------------------------
 // Message Type and Structure Declarations
 //-----------------------------------------
@@ -519,6 +526,7 @@ class loraPoint2Point
     float packetErrorFraction = 0;
     uint32_t packetCount = 0;
     uint32_t packetErrorCount = 0;
+    uint16_t packetErrorMovingAvgPeriod = 6;
 
     //-----------------
     // Private classes

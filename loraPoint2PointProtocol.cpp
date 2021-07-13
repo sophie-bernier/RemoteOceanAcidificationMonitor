@@ -19,8 +19,9 @@
 void loraPoint2Point::updatePacketErrorFraction (bool packetSuccess)
 {
   ++packetCount;
-  packetErrorCount += (packetSuccess) ? 0 : 1;
-  packetErrorFraction = packetErrorCount / packetCount;
+  packetErrorCount += !packetSuccess;
+  packetErrorFraction += (float(!packetSuccess) - packetErrorFraction) /
+                         MIN(packetCount, packetErrorMovingAvgPeriod);
 }
 
 void loraPoint2Point::resetPacketErrorFraction ()

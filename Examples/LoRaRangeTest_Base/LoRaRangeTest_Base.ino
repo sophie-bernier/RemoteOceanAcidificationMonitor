@@ -176,6 +176,7 @@ void setup()
   display.drawRect( 0,  0, 32, 32, 1);
   */
   display.display();
+  point2point.startHeartbeats();
 }
 
 //-----------

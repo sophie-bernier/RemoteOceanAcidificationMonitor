@@ -37,8 +37,14 @@
 #define MAX_txPower 20
 
 #define LINK_CHANGE_TIMEOUT_MILLIS 3000
+#define HEARTBEAT_TIMEOUT_MILLIS 7000
+#define SUCCESSFUL_PACKETS_BEFORE_LINK_IS_TRUSTED 3
 
 #define USE_RH_RELIABLE_DATAGRAM true
+
+//--------
+// Macros
+//--------
 
 //-----------------------------------------
 // Message Type and Structure Declarations
@@ -106,6 +112,8 @@ enum msgType_t
   msgType_linkChangeRsp,
   msgType_wakeRequest,
   msgType_sleepRequest,
+  msgType_heartbeatReq,
+  msgType_heartbeatRsp,
   NUM_msgTypes
 };
 
@@ -426,12 +434,58 @@ class loraPoint2Point
     uint8_t buildStringFromSerial (Uart* dataPort);
     
     /**
+     * @brief Quick way of printing an array of bytes.
+     * 
+     * @param buf    Pointer to the array of bytes to print.
+     * @param bufLen Number of bytes to print.
+     * @param ascii  True: Prints buffer as characters. False: Prints buffer as hexadecimal number.
+     */
+    void printBuffer (uint8_t const * buf,
+                      uint8_t const bufLen,
+                      bool const ascii);
+    
+    /**
+     * @brief Quick way of printing an array of bytes. Assumes it has a message ID at index 0.
+     * 
+     * @param buf    Pointer to the array of bytes to print.
+     * @param bufLen Number of bytes to print.
+     * @overload
+     */
+    void printBuffer (uint8_t const * buf,
+                      uint8_t const bufLen);
+    
+    /**
+     * @brief Start transmitting a brief 'heartbeat' signal to let any endpoints in the vicinity know that the base is still there.
+     * 
+     */
+    void startHeartbeats ();
+
+    /**
+     * @brief Stop transmitting a brief 'heartbeat' signal to let any endpoints in the vicinity know that the base is still there.
+     * 
+     */
+    void stopHeartbeats ();
+
+    /**
      * @brief Transmits the current TX message's buffer contents to the specified destination.
      * 
      * @param destAddress The address of the destination, specified on that unit in the constructor of loraPoint2Point.
      */
     void serviceTx (uint8_t destAddress);
-
+    
+    /**
+     * @brief Transmits the current TX message's buffer contents to the specified destination.
+     * 
+     * @param destAddress The address of the destination, specified on that unit in the constructor of loraPoint2Point.
+     * @param buf         Pointer to the array of bytes to send.
+     * @param bufLen      Number of bytes to send.
+     * @param ascii       True: Sending ascii text. False: Sending binary data. Purely changes format of debug printing.
+     */
+    void serviceTx (uint8_t const destAddress,
+                    uint8_t * const buf,
+                    uint8_t const bufLen,
+                    bool const ascii);
+    
     /**
      * @brief Checks if there is a pending message. 
      * If so, acknowleges the message and calls the appropriate handler function.
@@ -447,7 +501,7 @@ class loraPoint2Point
      * @todo Complete prototype and definition.
      */
     void dataReq (uint8_t const  destAddress,
-                  uint8_t* const buf,
+                  uint8_t * const buf,
                   uint8_t const  numChars);
     
     /**
@@ -518,6 +572,8 @@ class loraPoint2Point
     uint32_t currentMillis = 0;
     float packetErrorFraction = 0;
     uint32_t packetCount = 0;
+    uint32_t packetErrorCount = 0;
+    uint16_t packetErrorMovingAvgPeriod = 6;
 
     //-----------------
     // Private classes
@@ -528,12 +584,34 @@ class loraPoint2Point
     simpleTimer linkChangeTimeoutTimer = simpleTimer(LINK_CHANGE_TIMEOUT_MILLIS,
                                                      currentMillis,
                                                      false);
+    simpleTimer heartbeatTimer = simpleTimer(HEARTBEAT_TIMEOUT_MILLIS,
+                                             currentMillis,
+                                             true);
     userCallbacks_t user;
     //list<simpleTimer*> simpleTimerList;
     
     //-------------------
     // Private functions
     //-------------------
+    
+    /**
+     * @brief Transmits a brief 'heartbeat' signal to let any endpoints in the vicinity know that the base is still there.
+     * 
+     */
+    void heartbeatReq ();
+
+    /**
+     * @brief Respond to the heartbeat signal with the address of this unit.
+     * 
+     */
+    void serviceHeartbeatReq ();
+    
+    /**
+     * @brief Perform some action in response to the response with the heartbeat signal.
+     * 
+     * @param srcAddr The address of the unit that recieved the heartbeat.
+     */
+    void serviceHeartbeatRsp (uint8_t srcAddr);
     
     /**
      * @brief Processes input from the serial port.

@@ -3,8 +3,6 @@
 // Designed to work with the RFM95 Feather M0 board.
 // This is the server.
 
-// foobarbaz
-
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <RHReliableDatagram.h>

@@ -11,6 +11,7 @@
 
 #include <Arduino.h>
 #include <loraPoint2PointProtocol.h>
+#include <commonMacros.h>
 
 //----------------------
 // Function Definitions
@@ -35,8 +36,6 @@ float const & loraPoint2Point::getPacketErrorFraction ()
 {
   return packetErrorFraction;
 }
-
-
 
 int loraPoint2Point::getLastAckSNR ()
 {
@@ -434,6 +433,7 @@ void loraPoint2Point::linkChangeReq (uint8_t const            destAddress,
     // call linkChangeReqTimeout if serviceLinkChangeRsp is not received in 5s.
     linkChangeTimeoutTimer.pause();
     linkChangeTimeoutTimer.clearDone();
+    linkChangeTimeoutTimer.setTimeout(LINK_CHANGE_TIMEOUT_MILLIS);
     serviceTimers();
     linkChangeTimeoutTimer.start();
   }
@@ -446,7 +446,7 @@ void loraPoint2Point::linkChangeReq (uint8_t const            destAddress,
 void loraPoint2Point::linkChangeReqTimeout ()
 {
   Serial.println("Link change request timed out.");
-  linkChangeTimeoutTimer.clearDone();
+  linkChangeTimeoutTimer.clearDone(); // redundant?
   setSpreadingFactor(previousSpreadingFactor);
   setBandwidth(previousSignalBandwidth);
   setTxPower(previousTxPower);
@@ -503,53 +503,143 @@ void loraPoint2Point::serviceLinkChangeRsp ()
 {
   Serial.println("Link change response received. Transmission OK on new settings!");
   linkChangeTimeoutTimer.pause();
+  linkChangeTimeoutTimer.clearDone();
+  linkChangeTimeoutTimer.setTimeout(SUCCESSFUL_PACKETS_BEFORE_LINK_IS_TRUSTED
+                                    * HEARTBEAT_TIMEOUT_MILLIS
+                                     + LINK_CHANGE_TIMEOUT_MILLIS);
   serviceTimers();
+  linkChangeTimeoutTimer.start();
+}
+
+void loraPoint2Point::startHeartbeats ()
+{
+  heartbeatTimer.start();
+  Serial.println("started heartbeats");
+}
+
+void loraPoint2Point::stopHeartbeats ()
+{
+  heartbeatTimer.pause();
+}
+
+void loraPoint2Point::heartbeatReq ()
+{
+  uint8_t heartbeatBuf [] = {msgType_heartbeatReq,
+                             thisAddress};
+  serviceTx(RH_BROADCAST_ADDRESS, heartbeatBuf, 2, false);
+}
+
+void loraPoint2Point::serviceHeartbeatReq ()
+{
+  delay(50);
+  uint8_t heartbeatRspBuf [] = {msgType_heartbeatRsp,
+                                thisAddress};
+  serviceTx(RH_BROADCAST_ADDRESS, heartbeatRspBuf, 2, false);
+}
+
+void loraPoint2Point::serviceHeartbeatRsp (uint8_t const srcAddr)
+{
+  
 }
 
 void loraPoint2Point::serviceTimers ()
 {
   currentMillis = millis();
   linkChangeTimeoutTimer.update();
+  heartbeatTimer.update();
   if (linkChangeTimeoutTimer.isDone())
   {
     linkChangeReqTimeout();
     linkChangeTimeoutTimer.clearDone();
   }
+  if (heartbeatTimer.isDone())
+  {
+    heartbeatReq();
+    heartbeatTimer.clearDone();
+  }
 }
 
-void loraPoint2Point::serviceTx (uint8_t destAddress)
+void loraPoint2Point::printBuffer (uint8_t const * buf,
+                                   uint8_t const bufLen)
+{
+  switch (buf[0])
+  {
+    case msgType_dataReq:
+    case msgType_dataRsp:
+      printBuffer(buf + 1, bufLen - 1, true);
+      break;
+    default:
+      printBuffer(buf + 1, bufLen - 1, false);
+      break;
+  }
+}
+
+void loraPoint2Point::printBuffer (uint8_t const * buf,
+                                   uint8_t const bufLen,
+                                   bool const ascii)
+{
+  if (ascii)
+  {
+    for (uint8_t i = 0; i < bufLen; i++)
+    {
+      Serial.print(char(buf[i]));
+    }
+  }
+  else
+  {
+    Serial.print("0x");
+    for (uint8_t i = 0; i < bufLen; i++)
+    {
+      if (buf[i] < 0x10)
+      {
+        Serial.print('0');
+      }
+      Serial.print(buf[i], HEX);
+    }
+  }
+}
+
+void loraPoint2Point::serviceTx (uint8_t const destAddress)
+{
+  serviceTx(destAddress, txMsg.buf, txMsg.bufLen, true);
+  txMsg.bufLen = 0;
+}
+
+void loraPoint2Point::serviceTx (uint8_t const destAddress,
+                                 uint8_t * const buf,
+                                 uint8_t const bufLen,
+                                 bool const ascii)
 {
   bool acknowleged = false;
-  if (txMsg.bufLen > 0)
+  if (bufLen > 0)
   {
     Serial.print("Attempting to transmit: \"");
-    for (uint8_t i = 1; i < txMsg.bufLen; i++)
-    {
-      Serial.print(char(txMsg.buf[i]));
-    }
+    printBuffer(buf + 1, bufLen - 1, ascii);
     Serial.println("\"");
     rf95.waitCAD();
     #if (USE_RH_RELIABLE_DATAGRAM > 0)
-    if (rhReliableDatagram.sendtoWait(txMsg.buf, txMsg.bufLen, destAddress) == true)
+    if (rhReliableDatagram.sendtoWait(buf, bufLen, destAddress) == true)
     {
-      Serial.println("Acknowleged!");
-      ackSnr = rf95.lastSNR();
-      Serial.print("ACK SNR: ");
-      Serial.println(rf95.lastSNR());
-      acknowleged = true;
+      if (destAddress != RH_BROADCAST_ADDRESS) // never acknowleged
+      {
+        Serial.println("Acknowleged!");
+        ackSnr = rf95.lastSNR();
+        Serial.print("ACK SNR: ");
+        Serial.println(ackSnr);
+        updatePacketErrorFraction(true);
+      }
     }
-    updatePacketErrorFraction(acknowleged);
-    if (acknowleged == false)
+    else
     {
+      updatePacketErrorFraction(false);
       Serial.println("Not acknowleged.");
     }
     #else // USE_RH_RELIABLE_DATAGRAM
-    rf95.send(txMsg.buf, txMsg.bufLen);
+    rf95.send(buf, bufLen);
     rf95.waitPacketSent();
     Serial.println("Sent successfully!");
     #endif  // USE_RH_RELIABLE_DATAGRAM
-    user.txInd(txMsg.buf, txMsg.bufLen, destAddress, acknowleged);
-    txMsg.bufLen = 0;
+    user.txInd(buf, bufLen, destAddress, acknowleged);
   }
   else
   {
@@ -577,15 +667,12 @@ void loraPoint2Point::serviceRx ()
     user.rxInd(rxMsg);
     Serial.print("RX SNR: ");
     Serial.println(rf95.lastSNR());
+    Serial.print("Received: \"");
+    printBuffer(rxMsg.buf, rxMsg.bufLen);
+    Serial.println("\"");
     switch (rxMsg.buf[0])
     {
       case msgType_dataReq:
-        Serial.print("Received: \"");
-        for (uint8_t i = 1; i < rxMsg.bufLen; i++)
-        {
-          Serial.print(char(rxMsg.buf[i]));
-        }
-        Serial.println("\"");
         break;
       case msgType_dataRsp:
         break;
@@ -597,10 +684,29 @@ void loraPoint2Point::serviceRx ()
                              int8_t            (rxMsg.buf[4]));
         break;
       case msgType_linkChangeRsp:
-        serviceLinkChangeRsp ();
+        serviceLinkChangeRsp();
+        break;
+      case msgType_heartbeatReq:
+        serviceHeartbeatReq();
+        break;
+      case msgType_heartbeatRsp:
+        serviceHeartbeatRsp(rxMsg.srcAddr);
         break;
       default:
         break;
+    }
+    updatePacketErrorFraction(true); // update to return false if a response to a request is not recieved
+    if (linkChangeTimeoutTimer.isRunning())
+    {
+      Serial.println(packetCount);
+      Serial.println(packetErrorCount);
+      linkChangeTimeoutTimer.reset();
+      if (packetCount - packetErrorCount > SUCCESSFUL_PACKETS_BEFORE_LINK_IS_TRUSTED)
+      {
+        linkChangeTimeoutTimer.pause();
+        linkChangeTimeoutTimer.clearDone();
+        serviceTimers();
+      }
     }
     rxMsg.bufLen = RH_RF95_MAX_MESSAGE_LEN;
   }

@@ -42,7 +42,7 @@ class simpleTimer
      * @param _repeating     Whether the timer repeats after timing out or not.
      * 
      * @overload
-     */       
+     */
     simpleTimer (uint32_t const _timeoutMillis,
                  uint32_t const & _currentMillis,
                  bool const _repeating
@@ -72,6 +72,11 @@ class simpleTimer
       started = true;
     }
 
+    void setTimeout (uint32_t _timeoutMillis)
+    {
+      timeoutMillis = _timeoutMillis;
+    }
+
     /**
      * @brief Resets the timer to zero elapsed time.
      * 
@@ -98,6 +103,10 @@ class simpleTimer
      */
     void update ()
     {
+      //Serial.print("cur: ");
+      //Serial.println(currentMillis);
+      //Serial.print("ref: ");
+      //Serial.println(referenceMillis);
       if (started)
       {
         /*
@@ -154,8 +163,8 @@ class simpleTimer
     }
   private:
     void (* timerCallback) () = NULL;
-    uint32_t const timeoutMillis = 0xFFFFFFFF;
-    uint32_t const & currentMillis = 0;
+    uint32_t timeoutMillis = 0xFFFFFFFF;
+    uint32_t const & currentMillis;
     uint32_t referenceMillis = 0;
     bool repeating = false;
     bool started = false;

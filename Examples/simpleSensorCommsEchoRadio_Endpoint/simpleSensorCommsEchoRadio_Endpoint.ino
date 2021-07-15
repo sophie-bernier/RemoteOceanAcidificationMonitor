@@ -69,14 +69,14 @@ void setup()
   // The default transmitter power is 13dBm, using PA_BOOST.
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
   // you can set transmitter powers from 5 to 23 dBm:
-  rf95.setTxPower(15, false);
+  rf95.setTxPower(2, false);
 }
 
 void loop() {
   // Transmit a string!
-  if (Serial.available()) // (Serial1.available())
+  if (Serial1.available()) // (Serial1.available())
   {
-    inputChar = Serial.read(); // Serial1.read();
+    inputChar = Serial1.read(); // Serial1.read();
     Serial.print(char(inputChar));
     // Add chars to ignore to this.
     if ((inputChar != '\n'
@@ -108,7 +108,7 @@ void loop() {
     for (uint8_t i = 0; i < outputBufLen; i++)
     {
       Serial.print(char(outputBuf[i]));
-      //Serial1.write(outputBuf[i]);
+      Serial1.write(outputBuf[i]);
     }
     Serial.println('\"');
     outputBufLen = RH_RF95_MAX_MESSAGE_LEN;

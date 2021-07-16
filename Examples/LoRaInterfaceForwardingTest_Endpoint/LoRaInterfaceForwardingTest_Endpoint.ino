@@ -123,10 +123,6 @@ void loop()
     done = false;
   }
   digitalWrite(14, HIGH);
-  digitalWrite(14, LOW);
-  digitalWrite(14, HIGH);
-  digitalWrite(14, LOW);
-  digitalWrite(14, HIGH);
   while(done == false && Serial1.available())
   {
     newChar = Serial1.read();
@@ -144,11 +140,6 @@ void loop()
         txBuf[txStringLen++] = newChar;
     }
   }
-  digitalWrite(14, LOW);
-  digitalWrite(15, HIGH);
-  digitalWrite(15, LOW);
-  digitalWrite(15, HIGH);
-  digitalWrite(15, LOW);
   digitalWrite(15, HIGH);
   if (txStringLen > 1
       && done == true)
@@ -157,10 +148,6 @@ void loop()
     Serial.println(" TX");
     point2point.rf95.waitCAD();
     //point2point.rhDatagram.sendto(txBuf, txStringLen, 0xBB);
-    digitalWrite(17, HIGH);
-    digitalWrite(17, LOW);
-    digitalWrite(17, HIGH);
-    digitalWrite(17, LOW);
     digitalWrite(17, HIGH);
     point2point.rhReliableDatagram.sendtoWait(txBuf, txStringLen, 0xBB);
     digitalWrite(17, LOW);
@@ -207,10 +194,6 @@ void loop()
     }
   }
   */
-  digitalWrite(16, HIGH);
-  digitalWrite(16, LOW);
-  digitalWrite(16, HIGH);
-  digitalWrite(16, LOW);
   digitalWrite(16, HIGH);
   if (!Serial1.available() && done == true)
   {

@@ -67,6 +67,7 @@ void setup()
   Serial.println("HW Serial 1 init OK!");
   digitalWrite(10, HIGH); // tie SD high
   point2point.setupRadio();
+  point2point.rhReliableDatagram.setTimeout(100);
   pinMode(14, OUTPUT);
   pinMode(15, OUTPUT);
   pinMode(16, OUTPUT);

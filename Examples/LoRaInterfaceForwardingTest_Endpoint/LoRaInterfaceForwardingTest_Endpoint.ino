@@ -70,9 +70,15 @@ void setup()
   pinMode(14, OUTPUT);
   pinMode(15, OUTPUT);
   pinMode(16, OUTPUT);
+  pinMode(17, OUTPUT);
+  digitalWrite(14, HIGH);
   digitalWrite(14, LOW);
+  digitalWrite(15, HIGH);
   digitalWrite(15, LOW);
+  digitalWrite(16, HIGH);
   digitalWrite(16, LOW);
+  digitalWrite(17, HIGH);
+  digitalWrite(17, LOW);
 }
  
 //-----------
@@ -150,7 +156,13 @@ void loop()
     Serial.println(" TX");
     point2point.rf95.waitCAD();
     //point2point.rhDatagram.sendto(txBuf, txStringLen, 0xBB);
+    digitalWrite(17, HIGH);
+    digitalWrite(17, LOW);
+    digitalWrite(17, HIGH);
+    digitalWrite(17, LOW);
+    digitalWrite(17, HIGH);
     point2point.rhReliableDatagram.sendtoWait(txBuf, txStringLen, 0xBB);
+    digitalWrite(17, LOW);
     txStringLen = 1;
     //txString.getBytes(dataField, DATA_FIELD_LEN);
     //Serial.println(txString);

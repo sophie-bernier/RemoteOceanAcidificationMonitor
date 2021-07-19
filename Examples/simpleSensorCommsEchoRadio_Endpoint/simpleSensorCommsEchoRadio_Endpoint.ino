@@ -9,7 +9,11 @@
 #define RFM95_RST 4
 #define RFM95_INT 3
 #define RF95_FREQ 902.5
-#define RH_RF95_MAX_MESSAGE_LEN 128
+#define RH_RF95_MAX_MESSAGE_LEN 255
+
+#define USB_SERIAL_BAUD 115200
+#define SEAPHOX_BAUD    4800
+#define PROCV_BAUD      9600
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 uint8_t inputBuf[RH_RF95_MAX_MESSAGE_LEN];
@@ -31,7 +35,7 @@ void setup()
   {
     delay(1);
   }
-  Serial1.begin(9600);
+  Serial1.begin(4800);
   while (!Serial1)
   {
     delay(1);
@@ -93,18 +97,17 @@ void loop() {
   while(done == false && Serial1.available())
   {
     inputChar = Serial1.read();
-    Serial.print(char(inputChar));
     switch (inputChar)
     {
       case '\n': // terminate and exit
       case '\r':
-      //case '>':
+        Serial.print(char(inputChar));
         done = true;
       case ' ': // ignore
-      //case '\r':
       case '*':
         break;
       default:
+        Serial.print(char(inputChar));
         inputBuf[inputBufIdx] = inputChar;
         inputBufIdx++;
     }

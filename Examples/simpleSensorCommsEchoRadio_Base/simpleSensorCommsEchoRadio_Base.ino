@@ -9,7 +9,7 @@
 #define RFM95_RST 4
 #define RFM95_INT 3
 #define RF95_FREQ 902.5
-#define RH_RF95_MAX_MESSAGE_LEN 128
+#define RH_RF95_MAX_MESSAGE_LEN 255
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 uint8_t inputBuf[RH_RF95_MAX_MESSAGE_LEN];
@@ -17,6 +17,7 @@ uint8_t inputBufIdx = 0;
 uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
 char inputChar = 0;
+bool done = true;
 
 void setup()
 {
@@ -71,45 +72,43 @@ void loop() {
   // Transmit a string!
   if (Serial.available())
   {
+    done = false;
+  }
+  while(done == false && Serial.available())
+  {
     inputChar = Serial.read();
     Serial.print(char(inputChar));
-    // Add chars to ignore to this.
-    if (inputChar != '\n'
-        && inputChar != '\r'
-        && inputChar != '$'
-        && inputChar != '&'
-        && inputBufIdx < RH_RF95_MAX_MESSAGE_LEN)
+    switch (inputChar)
     {
-      inputBuf[inputBufIdx] = inputChar;
-      inputBufIdx++;
+      case '\n': // terminate and exit
+      case '\r':
+        done = true;
+      case ' ': // ignore
+      case '*':
+        break;
+      default:
+        inputBuf[inputBufIdx] = inputChar;
+        inputBufIdx++;
+        break;
+      case '&':
+        inputBuf[inputBufIdx] = '\r';
+        inputBufIdx++;
+        break;
+      case '$':
+        inputBuf[inputBufIdx] = 0x1B;
+        inputBufIdx++;
+        break;
     }
-    // Special start key
-    if (inputChar == '$')
-    {
-      inputBuf[inputBufIdx] = 27;
-      inputBufIdx++;
-    }
-    if (inputChar == '&')
-    {
-      inputBuf[inputBufIdx] = '\r';
-      inputBufIdx++;
-    }
-    // \n triggers sending
-    if (inputChar == '\n')
-        //|| inputChar == '\r')
-    {
-      Serial.print("Sending: \"");
-      for (uint8_t i = 0; i < inputBufIdx; i++)
-      {
-        Serial.print(char(inputBuf[i]));
-      }
-      Serial.println('\"');
-      rf95.waitCAD();
-      rf95.send(inputBuf, inputBufIdx);
-      inputBufIdx = 0;
-      rf95.waitPacketSent();
-      Serial.println("Sent successfully!");
-    }
+  }
+  if (inputBufIdx > 0
+      && done == true)
+  {
+    Serial.println(" TX");
+    rf95.waitCAD();
+    rf95.send(inputBuf, inputBufIdx);
+    inputBufIdx = 0;
+    rf95.waitPacketSent();
+    Serial.println("Sent successfully!");
   }
   if (rf95.recv(outputBuf, &outputBufLen))
   {

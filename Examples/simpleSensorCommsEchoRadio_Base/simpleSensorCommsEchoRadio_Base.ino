@@ -77,6 +77,7 @@ void loop() {
     if (inputChar != '\n'
         && inputChar != '\r'
         && inputChar != '$'
+        && inputChar != '&'
         && inputBufIdx < RH_RF95_MAX_MESSAGE_LEN)
     {
       inputBuf[inputBufIdx] = inputChar;
@@ -88,8 +89,14 @@ void loop() {
       inputBuf[inputBufIdx] = 27;
       inputBufIdx++;
     }
+    if (inputChar == '&')
+    {
+      inputBuf[inputBufIdx] = '\r';
+      inputBufIdx++;
+    }
     // \n triggers sending
     if (inputChar == '\n')
+        //|| inputChar == '\r')
     {
       Serial.print("Sending: \"");
       for (uint8_t i = 0; i < inputBufIdx; i++)

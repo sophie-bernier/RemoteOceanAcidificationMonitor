@@ -4,6 +4,21 @@
 
 #include <SPI.h>
 #include <RH_RF95.h>
+#include <loraPoint2PointProtocolLightweight.h>
+#include "wiring_private.h" // Required for pinPeripheral function.
+
+#define PIN_SERIAL2_RX       (11ul)               // Pin description number for PIO_SERCOM on D11.
+#define PIN_SERIAL2_TX       (10ul)               // Pin description number for PIO_SERCOM on D10.
+#define PAD_SERIAL2_TX       (UART_TX_PAD_2)      // Pin 10 is SERCOM pad 2 of this channel.
+#define PAD_SERIAL2_RX       (SERCOM_RX_PAD_0)    // Pin 11 is SERCOM pad 0 of this channel.
+// Declare SERCOM object with pins belonging to the desired SERCOM's primary or alternate channel and the pads corresponding to those pins. 
+// TX can use the pin corresponding to UART_TX_PAD_0 or UART_TX_PAD_2
+// RX can use the pin corresponding to SERCOM_RX_PAD_0, SERCOM_RX_PAD_1, SERCOM_RX_PAD_3, or SERCOM_RX_PAD_4
+Uart Serial2(&sercom1,
+             PIN_SERIAL2_RX,
+             PIN_SERIAL2_TX,
+             PAD_SERIAL2_RX,
+             PAD_SERIAL2_TX);
 
 #define RFM95_CS  8
 #define RFM95_RST 4
@@ -11,17 +26,24 @@
 #define RF95_FREQ 902.5
 #define RH_RF95_MAX_MESSAGE_LEN 255
 
-#define USB_SERIAL_BAUD 115200
-#define SEAPHOX_BAUD    4800
-#define PROCV_BAUD      9600
+#define USB_SERIAL_BAUD     115200
+#define SEAPHOX_SERIAL_BAUD 4800
+#define PROCV_SERIAL_BAUD   9600
+
+#define SEAPHOX_SERIAL Serial1
+#define PROCV_SERIAL   Serial2
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
-uint8_t inputBuf[RH_RF95_MAX_MESSAGE_LEN];
-uint8_t inputBufIdx = 0;
+uint8_t seaphoxBuf[RH_RF95_MAX_MESSAGE_LEN];
+uint8_t seaphoxBufIdx = 1;
+uint8_t procvBuf[RH_RF95_MAX_MESSAGE_LEN];
+uint8_t procvBufIdx = 1;
 uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
-uint8_t inputChar = 0;
-bool done = true;
+bool procvDone = true;
+bool seaphoxDone = true;
+
+void forwardUartToRadio (Uart & hwSerial, uint8_t * & inputBuffer, uint8_t & inputBufIdx, bool & inputBufDone);
 
 void setup()
 {
@@ -30,17 +52,23 @@ void setup()
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
-  Serial.begin(115200);
+  Serial.begin(USB_SERIAL_BAUD);
   while (!Serial)
   {
     delay(1);
   }
-  Serial1.begin(4800);
-  while (!Serial1)
+  SEAPHOX_SERIAL.begin(SEAPHOX_SERIAL_BAUD);
+  while (!SEAPHOX_SERIAL)
   {
     delay(1);
   }
-
+  PROCV_SERIAL.begin(PROCV_SERIAL_BAUD);
+  while (!PROCV_SERIAL)
+  {
+    delay(1);
+  }
+  pinPeripheral(10, PIO_SERCOM);
+  pinPeripheral(11, PIO_SERCOM);
   delay(100);
 
   Serial.println("Feather LoRa Echo Test - Endpoint!");
@@ -85,24 +113,62 @@ void setup()
 
 void loop() {
   // Transmit a string!
-  digitalWrite(14, HIGH);
-  digitalWrite(14, LOW);
-  digitalWrite(14, HIGH);
-  digitalWrite(14, LOW);
-  digitalWrite(14, HIGH);
-  if (Serial1.available())
+  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxDone);
+  forwardUartToRadio(PROCV_SERIAL, procvBuf, procvBufIdx, procvDone);
+  digitalWrite(16, HIGH);
+  if (rf95.recv(outputBuf, &outputBufLen))
   {
-    done = false;
+    Serial.print("RX ");
+    Serial.print(msgTypeNames[outputBuf[0]]);
+    Serial.print(" (type #");
+    Serial.print(outputBuf[0], DEC);
+    Serial.print("): ");
+    switch (outputBuf[0])
+    {
+      case msgType_seaphoxDataReq:
+        for (uint8_t i = 1; i < outputBufLen; i++)
+        {
+          Serial.print(char(outputBuf[i]));
+          SEAPHOX_SERIAL.print(char(outputBuf[i]));
+        }
+        break;
+      case msgType_procvDataReq:
+        for (uint8_t i = 1; i < outputBufLen; i++)
+        {
+          Serial.print(char(outputBuf[i]));
+          PROCV_SERIAL.print(char(outputBuf[i]));
+        }
+        break;
+      default:
+        for (uint8_t i = 1; i < outputBufLen; i++)
+        {
+          Serial.print(char(outputBuf[i]));
+        }
+        break;
+    }
+    Serial.println();
+    outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
   }
-  while(done == false && Serial1.available())
+  digitalWrite(16, LOW);
+}
+
+void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBufIdx, bool & inputBufDone)
+{
+  uint8_t inputChar;
+  digitalWrite(14, HIGH);
+  if (hwSerial.available())
   {
-    inputChar = Serial1.read();
+    inputBufDone = false;
+  }
+  while(inputBufDone == false && hwSerial.available())
+  {
+    inputChar = hwSerial.read();
     switch (inputChar)
     {
       case '\n': // terminate and exit
       case '\r':
         Serial.print(char(inputChar));
-        done = true;
+        inputBufDone = true;
       case ' ': // ignore
       case '*':
         break;
@@ -114,66 +180,48 @@ void loop() {
   }
   digitalWrite(14, LOW);
   digitalWrite(15, HIGH);
-  digitalWrite(15, LOW);
-  digitalWrite(15, HIGH);
-  digitalWrite(15, LOW);
-  digitalWrite(15, HIGH);
-  if (inputBufIdx > 0
-      && done == true)
+  if (inputBufIdx > 1
+      && inputBufDone == true)
   {
-    Serial.println(" TX");
+    Serial.print(": TX ");
+    if (hwSerial == SEAPHOX_SERIAL)
+    {
+      inputBuf[0] = msgType_seaphoxDataRsp;
+    }
+    else if (hwSerial == PROCV_SERIAL)
+    {
+      inputBuf[0] = msgType_procvDataRsp;
+    }
+    else
+    {
+      inputBuf[0] = msgType_dataRsp;
+    }
+    Serial.print(msgTypeNames[inputBuf[0]]);
+    Serial.print(" (type #");
+    Serial.print(inputBuf[0], DEC);
+    Serial.print(") from");
+    if (hwSerial == SEAPHOX_SERIAL)
+    {
+      Serial.print(" seaphox");
+    }
+    else if (hwSerial == PROCV_SERIAL)
+    {
+      Serial.print(" procv");
+    }
+    else
+    {
+      Serial.print(" other");
+    }
     rf95.waitCAD();
     rf95.send(inputBuf, inputBufIdx);
-    inputBufIdx = 0;
+    inputBufIdx = 1;
     rf95.waitPacketSent();
-    Serial.println("Sent successfully!");
+    Serial.println(" sent");
   }
   digitalWrite(15, LOW);
-  /*
-  if (Serial1.available()) // (Serial1.available())
-  {
-    inputChar = Serial1.read(); // Serial1.read();
-    Serial.print(char(inputChar));
-    // Add chars to ignore to this.
-    if ((inputChar != '\n'
-         && inputChar != '\r')
-        && inputBufIdx < RH_RF95_MAX_MESSAGE_LEN)
-    {
-      inputBuf[inputBufIdx] = inputChar;
-      inputBufIdx++;
-    }
-    // \n triggers sending
-    if (inputChar == '\n')
-    {
-      Serial.print("Sending: \"");
-      for (uint8_t i = 0; i < inputBufIdx; i++)
-      {
-        Serial.print(char(inputBuf[i]));
-      }
-      Serial.println('\"');
-      rf95.waitCAD();
-      rf95.send(inputBuf, inputBufIdx);
-      inputBufIdx = 0;
-      rf95.waitPacketSent();
-      Serial.println("Sent successfully!");
-    }
-  }
-  */
-  digitalWrite(16, HIGH);
-  digitalWrite(16, LOW);
-  digitalWrite(16, HIGH);
-  digitalWrite(16, LOW);
-  digitalWrite(16, HIGH);
-  if (rf95.recv(outputBuf, &outputBufLen))
-  {
-    Serial.print("Received: \"");
-    for (uint8_t i = 0; i < outputBufLen; i++)
-    {
-      Serial.print(char(outputBuf[i]));
-      Serial1.write(outputBuf[i]);
-    }
-    Serial.println('\"');
-    outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
-  }
-  digitalWrite(16, LOW);
+}
+
+void SERCOM1_Handler() // Interrupt handler for SERCOM1
+{
+  Serial2.IrqHandler();
 }

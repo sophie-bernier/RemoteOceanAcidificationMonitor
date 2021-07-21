@@ -4,7 +4,7 @@
 // This is the client, with SD logging and an OLED display.
 
 #include <SPI.h>
-#include <Wire.h>
+#include <Wire.h> 
 #include <SD.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -89,7 +89,8 @@ void setup()
   }
   Serial.println("Hello World!");
   
-  digitalWrite(10, HIGH); // tie SD high
+  digitalWrite(SD_CS, HIGH); // tie SD high
+  digitalWrite(RFM95_CS, HIGH); // tie radio high
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
   {

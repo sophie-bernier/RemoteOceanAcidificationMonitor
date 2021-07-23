@@ -1,11 +1,13 @@
 // Echoes serial communication over UART and vice versa.
 // Koichi approved.
 // Designed to work with the RFM95 Feather M0 board.
-
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <sensors.h>
 #include <loraPoint2PointProtocolLightweight.h>
+
+#define DEBUG_ENABLE_DSSS false
+#define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false
 
 #define RFM95_CS  8
 #define RFM95_RST 4
@@ -13,13 +15,24 @@
 #define RF95_FREQ 902.5
 #define RH_RF95_MAX_MESSAGE_LEN 255
 
+#if DEBUG_ENABLE_DSSS
+#define FREQ_CHANGE_INTERVAL_MS 1200
+#endif // DEBUG_ENABLE_DSSS
+
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 uint8_t inputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t inputBufIdx = 1;
+uint32_t inputBufCksum = 0;
 uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
+uint32_t outputBufCksum = 0;
 char inputChar = 0;
 bool done = true;
+#if DEBUG_ENABLE_DSSS
+bool joined = false;
+bool joining = false;
+bool joinTxComplete = false;
+#endif // DEBUG_ENABLE_DSSS
 sensors_t sendTo = sensor_none;
 
 void setup()
@@ -52,6 +65,11 @@ void setup()
     while (1);
   }
   Serial.println("LoRa radio init OK!");
+  
+  #if DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT
+  rf95.setFreqHoppingPeriod(10);
+  Serial.println("Started hopping...");
+  #endif // DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT
 
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ))
@@ -72,6 +90,16 @@ void setup()
 }
 
 void loop() {
+  #if DEBUG_ENABLE_DSSS
+  if (joined == false)
+  {
+    joinTxComplete = !rf95.advanceFrequencySequence(false, FREQ_CHANGE_INTERVAL_MS/3);
+  }
+  else
+  {
+    rf95.advanceFrequencySequence(false, FREQ_CHANGE_INTERVAL_MS);
+  }
+  #endif // DEBUG_ENABLE_DSSS
   // Transmit a string!
   if (Serial.available())
   {
@@ -89,28 +117,45 @@ void loop() {
       case ' ': // ignore
       case '*':
         break;
+      #if DEBUG_ENABLE_DSSS
+      case '@':
+        sendTo = sensor_none;
+        joining = true;
+        joined = false;
+        done = true;
+        break;
+      #endif // DEBUG_ENABLE_DSSS
       case '$': // send this and subsequent messages to the seaphox
         sendTo = sensor_seapHOx;
         break;
-      case '%': // send this and subsequent messages to the seaphox
+      case '%': // send this and subsequent messages to the proCV
         sendTo = sensor_proCV;
         break;
       default:
         inputBuf[inputBufIdx] = inputChar;
+        inputBufCksum += (uint32_t)(inputChar);
         inputBufIdx++;
         break;
       case '&':
         inputBuf[inputBufIdx] = '\r';
+        inputBufCksum += (uint32_t)('\r');
         inputBufIdx++;
         break;
       case '#':
         inputBuf[inputBufIdx] = 0x1B;
+        inputBufCksum += (uint32_t)(0x1B);
         inputBufIdx++;
         break;
     }
   }
-  if (inputBufIdx > 1
-      && done == true)
+  if ((inputBufIdx > 1
+       && done == true)
+      #if DEBUG_ENABLE_DSSS
+      || (joining == true
+          && joinTxComplete == false))
+      #else // DEBUG_ENABLE_DSSS
+      )
+      #endif // DEBUG_ENABLE_DSSS
   {
     Serial.println(": TX ");
     switch (sendTo)
@@ -121,7 +166,13 @@ void loop() {
       case sensor_seapHOx:
         inputBuf[0] = msgType_seaphoxDataReq;
         break;
+      case sensor_none:
       default:
+      #if DEBUG_ENABLE_DSSS
+        Serial.println("JOINING");
+        joinTxComplete = true;
+        inputBufIdx = 1;
+      #endif // DEBUG_ENABLE_DSSS
         inputBuf[0] = msgType_dataReq;
         break;
     }
@@ -134,6 +185,8 @@ void loop() {
     inputBufIdx = 1;
     rf95.waitPacketSent();
     Serial.println("sent");
+    Serial.print("inputBufCksum = ");
+    Serial.println(inputBufCksum);
   }
   if (rf95.recv(outputBuf, &outputBufLen))
   {
@@ -142,11 +195,30 @@ void loop() {
     Serial.print(" (type #");
     Serial.print(outputBuf[0], DEC);
     Serial.print("): ");
-    for (uint8_t i = 1; i < outputBufLen; i++)
+    switch (outputBuf[0])
     {
-      Serial.print(char(outputBuf[i]));
+      case msgType_dataRsp:
+        #if DEBUG_ENABLE_DSSS
+        rf95.advanceFrequencySequence(true, FREQ_CHANGE_INTERVAL_MS);
+        Serial.println("Starting hopping.");
+        joined = true;
+        joining = false;
+        break;
+        #endif // DEBUG_ENABLE_DSSS
+      default:
+        for (uint8_t i = 1; i < outputBufLen; i++)
+        {
+          Serial.print(char(outputBuf[i]));
+        }
     }
     Serial.println();
+    for (uint8_t i = 1; i < outputBufLen; i++)
+    {
+      outputBufCksum += uint32_t(outputBuf[i]);
+    }
+    outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
+    Serial.print("outputBufCksum = ");
+    Serial.println(outputBufCksum);
     outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
   }
 }

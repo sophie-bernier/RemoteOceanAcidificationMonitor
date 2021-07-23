@@ -1,11 +1,13 @@
 // Echoes serial communication over UART and vice versa.
 // Koichi approved.
 // Designed to work with the RFM95 Feather M0 board.
-
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <loraPoint2PointProtocolLightweight.h>
 #include "wiring_private.h" // Required for pinPeripheral function.
+
+#define DEBUG_ENABLE_DSSS true
+#define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false
 
 #define PIN_SERIAL2_RX       (11ul)               // Pin description number for PIO_SERCOM on D11.
 #define PIN_SERIAL2_TX       (10ul)               // Pin description number for PIO_SERCOM on D10.
@@ -26,12 +28,19 @@ Uart Serial2(&sercom1,
 #define RF95_FREQ 902.5
 #define RH_RF95_MAX_MESSAGE_LEN 255
 
+#if DEBUG_ENABLE_DSSS
+#define FREQ_CHANGE_INTERVAL_MS 1200
+#endif // DEBUG_ENABLE_DSSS
+
 #define USB_SERIAL_BAUD     115200
 #define SEAPHOX_SERIAL_BAUD 4800
 #define PROCV_SERIAL_BAUD   9600
 
 #define SEAPHOX_SERIAL Serial1
 #define PROCV_SERIAL   Serial2
+
+#define DEBUG_ENABLE_DSSS false
+#define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 uint8_t seaphoxBuf[RH_RF95_MAX_MESSAGE_LEN];
@@ -40,6 +49,10 @@ uint8_t procvBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t procvBufIdx = 1;
 uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
+uint32_t outputBufCksum = 0;
+uint32_t inputBufCksum = 0;
+uint8_t rspBuf[RH_RF95_MAX_MESSAGE_LEN];
+uint8_t rspBufLen = 1;
 bool procvDone = true;
 bool seaphoxDone = true;
 
@@ -87,6 +100,11 @@ void setup()
   }
   Serial.println("LoRa radio init OK!");
 
+  #if DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT
+  rf95.setFreqHoppingPeriod(10);
+  Serial.println("Started hopping...");
+  #endif // DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT
+
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ))
   {
@@ -103,19 +121,27 @@ void setup()
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
   // you can set transmitter powers from 5 to 23 dBm:
   rf95.setTxPower(2, false);
+  /*
   pinMode(14, OUTPUT);
   pinMode(15, OUTPUT);
   pinMode(16, OUTPUT);
   digitalWrite(14, LOW);
   digitalWrite(15, LOW);
   digitalWrite(16, LOW);
+  */
 }
 
 void loop() {
+  #if DEBUG_ENABLE_DSSS
+  rf95.advanceFrequencySequence(false, FREQ_CHANGE_INTERVAL_MS);
+  #endif // DEBUG_ENABLE_DSSS
+  
   // Transmit a string!
   forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxDone);
   forwardUartToRadio(PROCV_SERIAL, procvBuf, procvBufIdx, procvDone);
+  /*
   digitalWrite(16, HIGH);
+  */
   if (rf95.recv(outputBuf, &outputBufLen))
   {
     Serial.print("RX ");
@@ -139,6 +165,16 @@ void loop() {
           PROCV_SERIAL.print(char(outputBuf[i]));
         }
         break;
+      case msgType_dataReq:
+        #if DEBUG_ENABLE_DSSS
+        Serial.println("Starting hopping.");
+        rspBuf[0] = msgType_dataRsp;
+        rf95.send(rspBuf, rspBufLen);
+        rf95.waitPacketSent();
+        rf95.advanceFrequencySequence(true, FREQ_CHANGE_INTERVAL_MS);
+        break;
+        #endif // DEBUG_ENABLE_DSSS
+        break;
       default:
         for (uint8_t i = 1; i < outputBufLen; i++)
         {
@@ -147,15 +183,25 @@ void loop() {
         break;
     }
     Serial.println();
+    for (uint8_t i = 1; i < outputBufLen; i++)
+    {
+      outputBufCksum += uint32_t(outputBuf[i]);
+    }
     outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
+    Serial.print("outputBufCksum = ");
+    Serial.println(outputBufCksum);
   }
+  /*
   digitalWrite(16, LOW);
+  */
 }
 
 void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBufIdx, bool & inputBufDone)
 {
   uint8_t inputChar;
+  /*
   digitalWrite(14, HIGH);
+  */
   if (hwSerial.available())
   {
     inputBufDone = false;
@@ -175,11 +221,14 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBuf
       default:
         Serial.print(char(inputChar));
         inputBuf[inputBufIdx] = inputChar;
+        inputBufCksum += (uint32_t)(inputChar);
         inputBufIdx++;
     }
   }
+  /*
   digitalWrite(14, LOW);
   digitalWrite(15, HIGH);
+  */
   if (inputBufIdx > 1
       && inputBufDone == true)
   {
@@ -217,8 +266,12 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBuf
     inputBufIdx = 1;
     rf95.waitPacketSent();
     Serial.println(" sent");
+    Serial.print("inputBufCksum = ");
+    Serial.println(inputBufCksum);
   }
+  /*
   digitalWrite(15, LOW);
+  */
 }
 
 void SERCOM1_Handler() // Interrupt handler for SERCOM1

@@ -377,6 +377,11 @@ uint8_t loraPoint2Point::buildStringFromSerialInner (char inputChar)
       txMsg.buf[txMsg.bufLen] = 27;
       txMsg.bufLen++;
     }
+    if (inputChar == '&')
+    {
+      txMsg.buf[txMsg.bufLen] = '\r';
+      txMsg.bufLen++;
+    }
     // \n triggers sending
     if (inputChar == '\n')
     {

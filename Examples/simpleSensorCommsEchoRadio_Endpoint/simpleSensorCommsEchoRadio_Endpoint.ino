@@ -6,7 +6,7 @@
 #include <loraPoint2PointProtocolLightweight.h>
 #include "wiring_private.h" // Required for pinPeripheral function.
 
-#define DEBUG_ENABLE_DSSS true
+#define DEBUG_ENABLE_DSSS false
 #define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false
 
 #define PIN_SERIAL2_RX       (11ul)               // Pin description number for PIO_SERCOM on D11.
@@ -25,7 +25,7 @@ Uart Serial2(&sercom1,
 #define RFM95_CS  8
 #define RFM95_RST 4
 #define RFM95_INT 3
-#define RF95_FREQ 902.5
+#define RF95_FREQ 903.0
 #define RH_RF95_MAX_MESSAGE_LEN 255
 
 #if DEBUG_ENABLE_DSSS

@@ -12,7 +12,7 @@
 #define RFM95_CS  8
 #define RFM95_RST 4
 #define RFM95_INT 3
-#define RF95_FREQ 902.5
+#define RF95_FREQ 903.0
 #define RH_RF95_MAX_MESSAGE_LEN 255
 
 #if DEBUG_ENABLE_DSSS
@@ -45,7 +45,7 @@ void setup()
   Serial.begin(115200);
   while (!Serial)
   {
-    delay(1);
+    delay(1); 
   }
 
   delay(100);

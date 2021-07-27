@@ -59,7 +59,7 @@ void setup()
     delay(1);
   }
   Serial.println("Feather LoRa Sensor Interface Forwarding Test - Endpoint");
-  Serial1.begin(9600);
+  Serial1.begin(4800);
   while (!Serial1)
   {
     delay(1);
@@ -154,7 +154,7 @@ void loop()
   {
     txBuf[0] = msgType_dataReq;
     Serial.println(" TX");
-    point2point.rf95.waitCAD();
+    //point2point.rf95.waitCAD();
     //point2point.rhDatagram.sendto(txBuf, txStringLen, 0xBB);
     digitalWrite(17, HIGH);
     digitalWrite(17, LOW);

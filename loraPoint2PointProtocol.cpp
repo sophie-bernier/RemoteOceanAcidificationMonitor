@@ -363,34 +363,27 @@ uint8_t loraPoint2Point::buildStringFromSerialInner (char inputChar)
       txMsg.buf[txMsg.bufLen] = msgType_dataReq;
       txMsg.bufLen++;
     }
-    // Add chars to ignore to this.
-    if ((inputChar != '\n'
-       && inputChar != '\r')
-      && txMsg.bufLen < RH_RF95_MAX_MESSAGE_LEN)
+    switch (inputChar)
     {
-      txMsg.buf[txMsg.bufLen] = inputChar;
-      txMsg.bufLen++;
+      case '\n':
+      case '\r':
+        return 1;
+      case '#':
+        txMsg.buf[txMsg.bufLen] = 27;
+        txMsg.bufLen++;
+      case '*':
+      case ' ':
+        break;
+      case '&':
+        txMsg.buf[txMsg.bufLen] = '\r';
+        txMsg.bufLen++;
+        break;
+      default:
+        txMsg.buf[txMsg.bufLen] = inputChar;
+        txMsg.bufLen++;
+        break;
     }
-    // Special start key
-    if (inputChar == '$')
-    {
-      txMsg.buf[txMsg.bufLen] = 27;
-      txMsg.bufLen++;
-    }
-    if (inputChar == '&')
-    {
-      txMsg.buf[txMsg.bufLen] = '\r';
-      txMsg.bufLen++;
-    }
-    // \n triggers sending
-    if (inputChar == '\n')
-    {
-      return 1;
-    }
-    else
-    {
-      return 0;
-    }
+    return 0;
   }
 }
 

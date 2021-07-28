@@ -42,6 +42,9 @@
 
 #define USE_RH_RELIABLE_DATAGRAM true
 
+#define DEBUG_MAKE_RF95_PUBLIC false
+#define DEBUG_MAKE_RELIABLE_DATAGRAM_PUBLIC false
+
 //--------
 // Macros
 //--------
@@ -289,6 +292,14 @@ class loraPoint2Point
 
                        }
     
+    #if (DEBUG_MAKE_RF95_PUBLIC == true)
+    RH_RF95 rf95;
+    #endif // DEBUG_MAKE_RF95_PUBLIC
+    
+    #if (DEBUG_MAKE_RELIABLE_DATAGRAM_PUBLIC == true)
+    RHReliableDatagram rhReliableDatagram;
+    #endif // DEBUG_MAKE_RELIABLE_DATAGRAM_PUBLIC
+
     //------------------
     // Public functions
     //------------------
@@ -578,9 +589,15 @@ class loraPoint2Point
     //-----------------
     // Private classes
     //-----------------
-
+    
+    #if (DEBUG_MAKE_RF95_PUBLIC == false)
     RH_RF95 rf95;
+    #endif // DEBUG_MAKE_RF95_PUBLIC
+
+    #if (DEBUG_MAKE_RELIABLE_DATAGRAM_PUBLIC == false)
     RHReliableDatagram rhReliableDatagram;
+    #endif // DEBUG_MAKE_RELIABLE_DATAGRAM_PUBLIC
+
     simpleTimer linkChangeTimeoutTimer = simpleTimer(LINK_CHANGE_TIMEOUT_MILLIS,
                                                      currentMillis,
                                                      false);

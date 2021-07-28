@@ -3,6 +3,7 @@
 // Designed to work with the RFM95 Feather M0 board.
 #include <SPI.h>
 #include <RH_RF95.h>
+#include <sensors.h>
 #include <loraPoint2PointProtocolLightweight.h>
 #include "wiring_private.h" // Required for pinPeripheral function.
 
@@ -51,15 +52,19 @@ uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
 uint32_t outputBufCksum = 0;
 uint32_t inputBufCksum = 0;
+uint32_t ledMillis = 0;
 uint8_t rspBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t rspBufLen = 1;
 bool procvDone = true;
 bool seaphoxDone = true;
+bool ledOn = false;
 
-void forwardUartToRadio (Uart & hwSerial, uint8_t * & inputBuffer, uint8_t & inputBufIdx, bool & inputBufDone);
+void forwardUartToRadio (Uart & hwSerial, uint8_t * & inputBuffer, uint8_t & inputBufIdx, bool & inputBufDone, sensors_t sensor);
 
 void setup()
 {
+  pinMode(13, OUTPUT);
+  
   digitalWrite(10, HIGH);
   
   pinMode(RFM95_RST, OUTPUT);
@@ -132,13 +137,21 @@ void setup()
 }
 
 void loop() {
+  // blink LED
+  if ((millis() - ledMillis) > 2000)
+  {
+    digitalWrite(13, ledOn);
+    ledOn = !ledOn;
+    ledMillis = millis();
+  }
+  
   #if DEBUG_ENABLE_DSSS
   rf95.advanceFrequencySequence(false, FREQ_CHANGE_INTERVAL_MS);
   #endif // DEBUG_ENABLE_DSSS
   
   // Transmit a string!
-  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxDone);
-  forwardUartToRadio(PROCV_SERIAL, procvBuf, procvBufIdx, procvDone);
+  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxDone, sensor_seapHOx);
+  forwardUartToRadio(PROCV_SERIAL, procvBuf, procvBufIdx, procvDone, sensor_proCV);
   /*
   digitalWrite(16, HIGH);
   */
@@ -193,10 +206,10 @@ void loop() {
   }
   /*
   digitalWrite(16, LOW);
-  */
+  */    
 }
 
-void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBufIdx, bool & inputBufDone)
+void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBufIdx, bool & inputBufDone, sensors_t sensor)
 {
   uint8_t inputChar;
   /*
@@ -233,11 +246,11 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBuf
       && inputBufDone == true)
   {
     Serial.print(": TX ");
-    if (hwSerial == SEAPHOX_SERIAL)
+    if (sensor == sensor_seapHOx)
     {
       inputBuf[0] = msgType_seaphoxDataRsp;
     }
-    else if (hwSerial == PROCV_SERIAL)
+    else if (sensor == sensor_proCV)
     {
       inputBuf[0] = msgType_procvDataRsp;
     }
@@ -249,11 +262,11 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBuf
     Serial.print(" (type #");
     Serial.print(inputBuf[0], DEC);
     Serial.print(") from");
-    if (hwSerial == SEAPHOX_SERIAL)
+    if (sensor == sensor_seapHOx)
     {
       Serial.print(" seaphox");
     }
-    else if (hwSerial == PROCV_SERIAL)
+    else if (sensor == sensor_proCV)
     {
       Serial.print(" procv");
     }

@@ -631,12 +631,11 @@ void loraPoint2Point::serviceTx (uint8_t const destAddress,
         ackSnr = rf95.lastSNR();
         Serial.print("ACK SNR: ");
         Serial.println(ackSnr);
-        updatePacketErrorFraction(true);
+        acknowleged = true;
       }
     }
     else
     {
-      updatePacketErrorFraction(false);
       Serial.println("Not acknowleged.");
     }
     #else // USE_RH_RELIABLE_DATAGRAM
@@ -644,6 +643,7 @@ void loraPoint2Point::serviceTx (uint8_t const destAddress,
     rf95.waitPacketSent();
     Serial.println("Sent successfully!");
     #endif  // USE_RH_RELIABLE_DATAGRAM
+    updatePacketErrorFraction(acknowleged);
     user.txInd(buf, bufLen, destAddress, acknowleged);
   }
   else

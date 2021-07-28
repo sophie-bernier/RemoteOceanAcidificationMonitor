@@ -34,7 +34,8 @@ enum msgType_t
   msgType_procvDataRsp,  // 10
   msgType_seaphoxDataReq,// 11
   msgType_seaphoxDataRsp,// 12
-  NUM_msgTypes           // 13
+  msgType_ack, // 13
+  NUM_msgTypes           // 14
 };
 
 String const msgTypeNames [] {"undefined message type", // 0
@@ -49,6 +50,7 @@ String const msgTypeNames [] {"undefined message type", // 0
                                     "procvDataReq",  // 9
                                     "procvDataRsp",  // 10
                                     "seaphoxDataReq", // 11
-                                    "seaphoxDataRsp"}; // 12
+                                    "seaphoxDataRsp", // 12
+                                    "ack"}; // 13
 
 #endif // LORA_POINT_2_POINT_LIGHTWEIGHT

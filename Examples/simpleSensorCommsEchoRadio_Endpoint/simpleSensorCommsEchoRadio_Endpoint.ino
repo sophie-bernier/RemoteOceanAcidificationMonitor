@@ -8,7 +8,8 @@
 #include "wiring_private.h" // Required for pinPeripheral function.
 
 #define DEBUG_ENABLE_DSSS false
-#define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false
+#define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false\
+#define ENABLE_ACK false
 
 #define PIN_SERIAL2_RX       (11ul)               // Pin description number for PIO_SERCOM on D11.
 #define PIN_SERIAL2_TX       (10ul)               // Pin description number for PIO_SERCOM on D10.
@@ -28,6 +29,10 @@ Uart Serial2(&sercom1,
 #define RFM95_INT 3
 #define RF95_FREQ 903.0
 #define RH_RF95_MAX_MESSAGE_LEN 255
+
+#if (ENABLE_ACK == true)
+#define ACK_LEN 2
+#endif // ENABLE_ACK
 
 #if DEBUG_ENABLE_DSSS
 #define FREQ_CHANGE_INTERVAL_MS 1200
@@ -51,6 +56,9 @@ uint8_t procvBufIdx = 1;
 uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
 uint32_t outputBufCksum = 0;
+#if (ENABLE_ACK == true)
+uint8_t ackBuf[ACK_LEN] = {msgType_ack, 0};
+#endif // ENABLE_ACK
 uint32_t inputBufCksum = 0;
 uint32_t ledMillis = 0;
 uint8_t rspBuf[RH_RF95_MAX_MESSAGE_LEN];
@@ -157,6 +165,7 @@ void loop() {
   */
   if (rf95.recv(outputBuf, &outputBufLen))
   {
+    Serial.println();
     Serial.print("RX ");
     Serial.print(msgTypeNames[outputBuf[0]]);
     Serial.print(" (type #");
@@ -164,6 +173,15 @@ void loop() {
     Serial.print("): ");
     switch (outputBuf[0])
     {
+      #if ENABLE_ACK
+      case msgType_ack:
+        Serial.print("to ");
+        Serial.print(msgTypeNames[outputBuf[1]]);
+        Serial.print(" (type #");
+        Serial.print(outputBuf[1], DEC);
+        Serial.print(")");
+        break;
+      #endif // ENABLE_ACK
       case msgType_seaphoxDataReq:
         for (uint8_t i = 1; i < outputBufLen; i++)
         {
@@ -189,6 +207,7 @@ void loop() {
         #endif // DEBUG_ENABLE_DSSS
         break;
       default:
+        Serial.print("BAR");
         for (uint8_t i = 1; i < outputBufLen; i++)
         {
           Serial.print(char(outputBuf[i]));
@@ -203,6 +222,14 @@ void loop() {
     outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
     Serial.print("outputBufCksum = ");
     Serial.println(outputBufCksum);
+    #if ENABLE_ACK
+    if (outputBuf[0] != msgType_ack)
+    {
+      ackBuf[1] = outputBuf[0];
+      rf95.send(ackBuf, ACK_LEN);
+      inputBufCksum += outputBuf[0];
+    }
+    #endif // ENABLE_ACK
   }
   /*
   digitalWrite(16, LOW);
@@ -242,7 +269,7 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBuf
   digitalWrite(14, LOW);
   digitalWrite(15, HIGH);
   */
-  if (inputBufIdx > 1
+  if (inputBufIdx > 1 
       && inputBufDone == true)
   {
     Serial.print(": TX ");

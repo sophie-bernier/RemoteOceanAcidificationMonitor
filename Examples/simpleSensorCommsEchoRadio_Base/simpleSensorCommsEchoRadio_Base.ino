@@ -16,6 +16,8 @@
 #define RF95_FREQ 903.0
 #define RH_RF95_MAX_MESSAGE_LEN 255
 
+#define SD_CS 10
+
 #if ENABLE_ACK
 #define ACK_LEN 2
 #endif // ENABLE_ACK
@@ -45,7 +47,8 @@ sensors_t sendTo = sensor_none;
 
 void setup()
 {
-  digitalWrite(10, HIGH);
+  pinMode(SD_CS, OUTPUT);
+  digitalWrite(SD_CS, HIGH);
 
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);

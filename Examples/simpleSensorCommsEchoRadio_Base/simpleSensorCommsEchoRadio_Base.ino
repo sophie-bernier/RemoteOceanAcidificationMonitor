@@ -8,12 +8,19 @@
 
 #define DEBUG_ENABLE_DSSS false
 #define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false
+#define ENABLE_ACK false
 
 #define RFM95_CS  8
 #define RFM95_RST 4
 #define RFM95_INT 3
 #define RF95_FREQ 903.0
 #define RH_RF95_MAX_MESSAGE_LEN 255
+
+#define SD_CS 10
+
+#if ENABLE_ACK
+#define ACK_LEN 2
+#endif // ENABLE_ACK
 
 #if DEBUG_ENABLE_DSSS
 #define FREQ_CHANGE_INTERVAL_MS 1200
@@ -26,6 +33,9 @@ uint32_t inputBufCksum = 0;
 uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
 uint32_t outputBufCksum = 0;
+#if ENABLE_ACK
+uint8_t ackBuf[ACK_LEN] = {msgType_ack, 0};
+#endif // ENABLE_ACK
 char inputChar = 0;
 bool done = true;
 #if DEBUG_ENABLE_DSSS
@@ -37,7 +47,8 @@ sensors_t sendTo = sensor_none;
 
 void setup()
 {
-  digitalWrite(10, HIGH);
+  pinMode(SD_CS, OUTPUT);
+  digitalWrite(SD_CS, HIGH);
 
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
@@ -190,6 +201,7 @@ void loop() {
   }
   if (rf95.recv(outputBuf, &outputBufLen))
   {
+    Serial.println();
     Serial.print("RX ");
     Serial.print(msgTypeNames[outputBuf[0]]);
     Serial.print(" (type #");
@@ -197,6 +209,15 @@ void loop() {
     Serial.print("): ");
     switch (outputBuf[0])
     {
+      #if ENABLE_ACK
+      case msgType_ack:
+        Serial.print("to ");
+        Serial.print(msgTypeNames[outputBuf[1]]);
+        Serial.print(" (type #");
+        Serial.print(outputBuf[1], DEC);
+        Serial.print(")");
+        break;
+      #endif // ENABLE_ACK
       case msgType_dataRsp:
         #if DEBUG_ENABLE_DSSS
         rf95.advanceFrequencySequence(true, FREQ_CHANGE_INTERVAL_MS);
@@ -210,6 +231,7 @@ void loop() {
         {
           Serial.print(char(outputBuf[i]));
         }
+        break;
     }
     Serial.println();
     for (uint8_t i = 1; i < outputBufLen; i++)
@@ -220,5 +242,13 @@ void loop() {
     Serial.print("outputBufCksum = ");
     Serial.println(outputBufCksum);
     outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
+    #if ENABLE_ACK
+    if (outputBuf[0] != msgType_ack)
+    {
+      ackBuf[1] = outputBuf[0];
+      rf95.send(ackBuf, ACK_LEN);
+      inputBufCksum += outputBuf[0];
+    }
+    #endif // ENABLE_ACK
   }
 }

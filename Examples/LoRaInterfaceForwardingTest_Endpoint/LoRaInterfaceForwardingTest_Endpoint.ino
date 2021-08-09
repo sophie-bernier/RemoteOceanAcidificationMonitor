@@ -59,7 +59,7 @@ void setup()
     delay(1);
   }
   Serial.println("Feather LoRa Sensor Interface Forwarding Test - Endpoint");
-  Serial1.begin(9600);
+  Serial1.begin(4800);
   while (!Serial1)
   {
     delay(1);
@@ -108,13 +108,14 @@ void loop()
   currentMillis = millis();
   
   // Transmit a string!
-  /* 
+  /*
   if (point2point.buildStringFromSerial(&Serial1))
   {
     point2point.serviceTx(0xBB);
+    delay(50);
   }
   */
-   
+  
   //txString = Serial1.readStringUntil('\r');
 
   if (Serial1.available())
@@ -132,11 +133,11 @@ void loop()
     switch (newChar)
     {
       case '\n': // terminate and exit
-      case '\r':
-      case '>':
-      case '*':
+      case '\r': 
+      //case '>':
         done = true;
       case ' ': // ignore
+      case '*':
         break;
       default:
         Serial.print(char(newChar));
@@ -154,7 +155,7 @@ void loop()
   {
     txBuf[0] = msgType_dataReq;
     Serial.println(" TX");
-    point2point.rf95.waitCAD();
+    //point2point.rf95.waitCAD();
     //point2point.rhDatagram.sendto(txBuf, txStringLen, 0xBB);
     digitalWrite(17, HIGH);
     digitalWrite(17, LOW);
@@ -163,12 +164,14 @@ void loop()
     digitalWrite(17, HIGH);
     point2point.rhReliableDatagram.sendtoWait(txBuf, txStringLen, 0xBB);
     digitalWrite(17, LOW);
+    delay(50); // avoid race conditions.
     txStringLen = 1;
     //txString.getBytes(dataField, DATA_FIELD_LEN);
     //Serial.println(txString);
     //point2point.rhDatagram.sendto(txBuf, txString.length() + 1, 0xBB);
   }
   digitalWrite(15, LOW);
+  
   
 
   /*  
@@ -206,13 +209,17 @@ void loop()
     }
   }
   */
+  
   digitalWrite(16, HIGH);
   digitalWrite(16, LOW);
   digitalWrite(16, HIGH);
   digitalWrite(16, LOW);
   digitalWrite(16, HIGH);
+  
+  
   if (!Serial1.available() && done == true)
   {
+  
     point2point.serviceRx();
   }
   digitalWrite(16, LOW);

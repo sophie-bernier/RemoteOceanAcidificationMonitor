@@ -1,14 +1,27 @@
-// Echoes serial communication over UART and vice versa.
-// Koichi approved.
-// Designed to work with the RFM95 Feather M0 board.
+
+/**
+ * @file simpleSensorCommsEchoRadio_Endpoint.ino
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2021-08-09
+ * 
+ * @copyright Copyright (c) 2021
+ * 
+ */
+
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <sensors.h>
 #include <loraPoint2PointProtocolLightweight.h>
 #include "wiring_private.h" // Required for pinPeripheral function.
 
+/**
+ * @brief Enable direct sequence spreading spectrum
+ * 
+ */
 #define DEBUG_ENABLE_DSSS false
-#define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false\
+#define DEBUG_ENABLE_FHSS_ON_RF95_INTERRUPT false
 #define ENABLE_ACK false
 
 #define PIN_SERIAL2_RX       (11ul)               // Pin description number for PIO_SERCOM on D11.
@@ -67,8 +80,21 @@ bool procvDone = true;
 bool seaphoxDone = true;
 bool ledOn = false;
 
+/**
+ * @brief forwardUartToRadio
+ * 
+ * @param hwSerial 
+ * @param inputBuffer 
+ * @param inputBufIdx 
+ * @param inputBufDone 
+ * @param sensor 
+ */
 void forwardUartToRadio (Uart & hwSerial, uint8_t * & inputBuffer, uint8_t & inputBufIdx, bool & inputBufDone, sensors_t sensor);
 
+/**
+ * @brief setup function
+ * 
+ */
 void setup()
 {
   pinMode(13, OUTPUT);

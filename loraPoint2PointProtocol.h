@@ -36,6 +36,10 @@
 #define MIN_txPower 2
 #define MAX_txPower 20
 
+/**
+ * @brief Millis to wait after sending a link change request before resetting radio settings if a link change response is not recieved.
+ * 
+ */
 #define LINK_CHANGE_TIMEOUT_MILLIS 3000
 #define HEARTBEAT_TIMEOUT_MILLIS 7000
 #define SUCCESSFUL_PACKETS_BEFORE_LINK_IS_TRUSTED 3

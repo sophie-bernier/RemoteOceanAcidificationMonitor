@@ -1,10 +1,12 @@
 /**
- * ProO.h
- * By Sophie Bernier
- *  2021-05-21
- * Last Modified 2021-05-21
- * Library to handle communication with the
- * Pro-Oceanus CO2 Pro CV sensor.
+ * @file proO.h
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Library to handle communication with the Pro-Oceanus CO2 Pro CV sensor. Currently unimplemented. Finishing implementation would mean locally implementing the proCV interface, resulting in a drastically lowered radio use.
+ * @version 0.1
+ * @date 2021-05-21
+ * 
+ * @copyright Copyright (c) 2021
+ * 
  */
 
 enum sampleMode_t

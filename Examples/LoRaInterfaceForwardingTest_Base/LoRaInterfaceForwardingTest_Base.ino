@@ -1,7 +1,20 @@
-// Echoes serial communication over UART and vice versa.
-// Koichi approved.
-// Designed to work with the RFM95 Feather M0 board.
-// This is the client, with SD logging and an OLED display.
+/**
+ * @file LoRaInterfaceForwardingTest_Base.ino
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Echoes serial communication over UART and vice versa. Sensor interface currently broken pending upgrades to the protocol.
+ * @version 0.1
+ * @date 2021-07
+ * 
+ * @copyright Copyright (c) 2021
+ *
+ * @warning This sketch is currently broken! See Problem Solving 7 (ps7). This sketch has the potential to enter a race condition in which the endpoint transmits before the base is ready to recieve it. This is an issue with the lack of defined transmission windows in this program.
+ *
+ * @warning Never operate radio devices without either a suitable antenna (or other load) attached to the active transmitter. This will permanently damage the RF electronics, leading to a total loss of function. 
+ * 
+ * This is the client, with SD logging and an OLED display.
+ * It is based on LoRaRangeTest, using RHReliableDatagram and loraPoint2PointProtocol.
+ * 
+ */
 
 #include <SPI.h>
 #include <Wire.h> 

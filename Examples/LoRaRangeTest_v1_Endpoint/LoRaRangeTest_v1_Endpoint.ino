@@ -1,6 +1,13 @@
-// Echoes serial communication over UART and vice versa.
-// Koichi approved.
-// Designed to work with the RFM95 Feather M0 board.
+/**
+ * @file LoRaRangeTest_v1_Endpoint.ino
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Simpler version of LoRaRangeTest_Endpoint that also echoes recieved messages to the hardware serial port.
+ * @version 0.1
+ * @date 2021-06
+ * 
+ * @copyright Copyright (c) 2021
+ * 
+ */
 
 #include <SPI.h>
 #include <RH_RF95.h>

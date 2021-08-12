@@ -1,3 +1,14 @@
+/**
+ * @file Serial_1_2_TX.ino
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Demonstrates transmitting messages on the default hardware serial (Serial1) and on a newly instantiated hardware serial on pins 10/11 (Serial2).
+ * @version 0.1
+ * @date 2021-08-12
+ * 
+ * @copyright Copyright (c) 2021
+ * 
+ */
+
 #include "wiring_private.h"
 #define PIN_SERIAL2_RX       (11ul)               // Pin description number for PIO_SERCOM on D11.
 #define PIN_SERIAL2_TX       (10ul)               // Pin description number for PIO_SERCOM on D10.

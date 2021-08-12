@@ -1,7 +1,18 @@
-// Echoes serial communication over UART and vice versa.
-// Koichi approved.
-// Designed to work with the RFM95 Feather M0 board.
-// This is the server.
+/**
+ * @file LoRaInterfaceForwardingTest_Endpoint.ino
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Echoes serial communication over UART and vice versa. Sensor interface currently broken pending upgrades to the protocol.
+ * @version 0.1
+ * @date 2021-07
+ * 
+ * @copyright Copyright (c) 2021
+ *
+ * @warning This is currently broken! See Problem Solving 7 (ps7). This sketch has the potential to enter a race condition in which the endpoint transmits before the base is ready to recieve it. This is an issue with the lack of defined transmission windows in this program.
+ * 
+ * This is the client, with SD logging and an OLED display.
+ * It is based on LoRaRangeTest, using RHReliableDatagram and loraPoint2PointProtocol.
+ * 
+ */
 
 #include <SPI.h>
 #include <RH_RF95.h>
@@ -109,6 +120,7 @@ void loop()
   
   // Transmit a string!
   /*
+  // Takes too long to transmit.
   if (point2point.buildStringFromSerial(&Serial1))
   {
     point2point.serviceTx(0xBB);
@@ -116,7 +128,8 @@ void loop()
   }
   */
   
-  //txString = Serial1.readStringUntil('\r');
+  // Old. Do not use.
+  // txString = Serial1.readStringUntil('\r');
 
   if (Serial1.available())
   {

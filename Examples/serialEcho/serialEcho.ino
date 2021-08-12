@@ -1,6 +1,13 @@
-// Echoes serial communication over UART and vice versa.
-// Koichi approved.
-// Designed to work with the RFM95 Feather M0 board.
+/**
+ * @file serialEcho.ino
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief The simplest possible implementation of echoing between the USB serial port and the radio. No sensor integration.
+ * @version 0.1
+ * @date 2021-06
+ * 
+ * @copyright Copyright (c) 2021
+ * 
+ */
 
 #include <SPI.h>
 #include <RH_RF95.h>

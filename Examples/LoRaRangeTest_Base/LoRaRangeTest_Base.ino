@@ -1,7 +1,55 @@
-// Echoes serial communication over UART and vice versa.
-// Koichi approved.
-// Designed to work with the RFM95 Feather M0 board.
-// This is the client, with SD logging and an OLED display.
+/**
+ * @file LoRaRangeTest_Base.ino
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Echoes serial communication over UART and vice versa while also sending out a test data request on an interval to test range response.
+ * @version 0.1
+ * @date 2021-07
+ * 
+ * @copyright Copyright (c) 2021
+ *
+ * @warning Never operate radio devices without either a suitable antenna (or other load) attached to the active transmitter. This will permanently damage the RF electronics, leading to a total loss of function. 
+ * 
+ * Designed to work with the RFM95 Feather M0 board.
+ * 
+ * This is the client, with SD logging (Adalogger featherwing, part # 2922) and an OLED display (Adafruit featherwing 128x32 oled, part # 4091).
+ * 
+ * It uses RHReliableDatagram and loraPoint2PointProtocol.
+ * 
+ * @section Interfaces
+ * @subsection USB
+ * Operates at 115200 baud, 8 data bits, 1 stop bit, and no parity bit.
+ * 
+ * Interface using a standard USB A to USB Micro-B male-male cable.
+ * 
+ * Control using a terminal emulator such as TeraTerm, Termite, or the built-in Arduino terminal emulator (on Windows). Set it to append a newline ('\\n') with every 'enter' press.
+ * 
+ * @subsection Settings
+ * To switch radio settings through the terminal emulator, type:
+ * 
+ * `![Parameter][Value]`
+ * 
+ * See the documentation for buildStringFromSerial for accepted parameters and values.
+ * 
+ * @subsection Buttons
+ * - Button A: Cycle through parameters (S: Spreading Factor, B: Bandwidth, F: Frequency channel, P: Transmission power)
+ * - Button B: Cycle through values.
+ * - Button C: Confirm and reset packet error rate, requesting that units in recieving range change their settings to the same values chosen if those values were modified from their previous values.
+ * 
+ * See the documentation for buildStringFromSerial in loraPoint2PointProtocol.h for accepted parameters and values.
+ * 
+ * @subsection Display
+ * @image html baseRangeTestDisplay.jpg "Annotated image of what will appear after initialization on the OLED display."
+ * 
+ * @subsection SD card logging
+ * 
+ * The format for SD card logging is:
+ * 
+ * Timestamp | Source Address | Destination Address | Message ID | Message Flags | Acknowleged | Message | spreadingFactor | signalBandwidth | frequencyChannel | txPower
+ *
+ * SD card contents are preserved between each restart, but the timestamp resets to zero and a new header with the above categories, allowing for new data to be easily distinguished from the old.
+ * Data is logged in .csv format.
+ */
+
 
 #include <SPI.h>
 #include <Wire.h> 

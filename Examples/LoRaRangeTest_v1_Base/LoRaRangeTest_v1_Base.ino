@@ -1,6 +1,15 @@
-// Echoes serial communication over UART and vice versa.
-// Koichi approved.
-// Designed to work with the RFM95 Feather M0 board.
+/**
+ * @file LoRaRangeTest_v1_Base.ino
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Simpler version of LoRaRangeTest_Base without logging or relying on external libraries.
+ * @version 0.1
+ * @date 2021-06
+ * 
+ * @copyright Copyright (c) 2021
+ * 
+ * @warning Never operate radio devices without either a suitable antenna (or other load) attached to the active transmitter. This will permanently damage the RF electronics, leading to a total loss of function. 
+ * 
+ */
 
 #include <SPI.h>
 #include <RH_RF95.h>

@@ -1,7 +1,29 @@
-// Echoes serial communication over UART and vice versa.
-// Koichi approved.
-// Designed to work with the RFM95 Feather M0 board.
-// This is the server.
+/**
+ * @file LoRaRangeTest_Endpoint.ino
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Acknowledges messages and displays them to UART. Does not interface with any sensors.
+ * @version 0.1
+ * @date 2021-07
+ * 
+ * @copyright Copyright (c) 2021
+ *
+ * @warning Never operate radio devices without either a suitable antenna (or other load) attached to the active transmitter. This will permanently damage the RF electronics, leading to a total loss of function. 
+ * 
+ * Designed to work with the RFM95 Feather M0 board.
+ * 
+ * This is the server.
+ * It is designed to operate while attached to a computer for data logging.
+ * 
+ * It uses RHReliableDatagram and loraPoint2PointProtocol.
+ * 
+ * @section Interfaces
+ * @subsection USB
+ * Operates at 115200 baud, 8 data bits, 1 stop bit, and no parity bit.
+ * 
+ * Interface using a standard USB A to USB Micro-B male-male cable.
+ * 
+ * Control using a terminal emulator such as TeraTerm, Termite, or the built-in Arduino terminal emulator (on Windows). Set it to append a newline ('\\n') with every 'enter' press.
+ */
 
 #include <SPI.h>
 #include <RH_RF95.h>

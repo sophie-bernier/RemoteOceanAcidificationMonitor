@@ -527,12 +527,12 @@ void loraPoint2Point::heartbeatReq ()
   serviceTx(RH_BROADCAST_ADDRESS, heartbeatBuf, 2, false);
 }
 
-void loraPoint2Point::serviceHeartbeatReq ()
+void loraPoint2Point::serviceHeartbeatReq (uint8_t const srcAddr)
 {
   delay(50);
   uint8_t heartbeatRspBuf [] = {msgType_heartbeatRsp,
                                 thisAddress};
-  serviceTx(RH_BROADCAST_ADDRESS, heartbeatRspBuf, 2, false);
+  serviceTx(srcAddr/*RH_BROADCAST_ADDRESS*/, heartbeatRspBuf, 2, false);
 }
 
 void loraPoint2Point::serviceHeartbeatRsp (uint8_t const srcAddr)
@@ -625,18 +625,19 @@ void loraPoint2Point::serviceTx (uint8_t const destAddress,
         Serial.print("ACK SNR: ");
         Serial.println(ackSnr);
         acknowleged = true;
+        updatePacketErrorFraction(acknowleged);
       }
     }
     else
     {
       Serial.println("Not acknowleged.");
+      updatePacketErrorFraction(acknowleged);
     }
     #else // USE_RH_RELIABLE_DATAGRAM
     rf95.send(buf, bufLen);
     rf95.waitPacketSent();
     Serial.println("Sent successfully!");
     #endif  // USE_RH_RELIABLE_DATAGRAM
-    updatePacketErrorFraction(acknowleged);
     user.txInd(buf, bufLen, destAddress, acknowleged);
   }
   else
@@ -685,7 +686,7 @@ void loraPoint2Point::serviceRx ()
         serviceLinkChangeRsp();
         break;
       case msgType_heartbeatReq:
-        serviceHeartbeatReq();
+        serviceHeartbeatReq(rxMsg.srcAddr);
         break;
       case msgType_heartbeatRsp:
         serviceHeartbeatRsp(rxMsg.srcAddr);

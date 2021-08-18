@@ -1,7 +1,7 @@
 /**
  * @file sensors.h
- * @author your name (you@domain.com)
- * @brief 
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Meant as a container class for emulated sensor interfaces. Currently just holds a list of the sensors.
  * @version 0.1
  * @date 2021-07-08
  * 

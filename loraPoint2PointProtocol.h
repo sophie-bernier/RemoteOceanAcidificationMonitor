@@ -425,12 +425,12 @@ class loraPoint2Point
      * And then entering a newline character (`\n`).
      * 
      * ! Signals the start of a debug command.
-     * Parameter |      Setting       | Values  |
-     * --------: | :----------------- | :------ |
-     *         S | Spreading factor   | 0 to 10 |
-     *         B | Signal bandwidth   | 0 to 3  |
-     *         C | Frequency channel  | 0 to 15 |
-     *         P | Transmission power | 1 to 20 |
+     * Parameter |      Setting       | Values
+     * --------: | :----------------- | :------
+     *         S | Spreading factor   | 0 to 10
+     *         B | Signal bandwidth   | 0 to 3
+     *         C | Frequency channel  | 0 to 15
+     *         P | Transmission power | 1 to 20
      * 
      * @param dataPort The serial port (hardware UART object or USB serial object) which should be scanned.
      * @return uint8_t The number of characters added to the TX buffer.
@@ -625,7 +625,7 @@ class loraPoint2Point
      * @brief Respond to the heartbeat signal with the address of this unit.
      * 
      */
-    void serviceHeartbeatReq ();
+    void serviceHeartbeatReq (uint8_t srcAddr);
     
     /**
      * @brief Perform some action in response to the response with the heartbeat signal.

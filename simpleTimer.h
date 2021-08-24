@@ -1,6 +1,6 @@
 /**
  * @file simpleTimer.h
- * @author Sophie Bernier (raptoronabicycle@gmail.com)
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
  * @brief Header file for the simpleTimer class and its dependent enums, defaults, et cetera.
  * @version 0.0.1
  * @date 2021-06-29

@@ -1,6 +1,6 @@
 /**
  * @file loraPoint2PointProtocol.cpp
- * @author Sophie Bernier (raptoronabicycle@gmail.com)
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
  * @brief Implementation file for the loraPoint2Point class and its dependent enums' operators, et cetera.
  * @version 0.0.1
  * @date 2021-06-29

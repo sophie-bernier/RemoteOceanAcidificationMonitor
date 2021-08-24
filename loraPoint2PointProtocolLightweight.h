@@ -1,7 +1,7 @@
 /**
  * @file loraPoint2PointProtocolLightweight.h
- * @author your name (you@domain.com)
- * @brief Less overhead for high datarate applications.
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Less overhead for high datarate applications. Currently just contains common message type definitions.
  * @version 0.1
  * @date 2021-07-19
  * 

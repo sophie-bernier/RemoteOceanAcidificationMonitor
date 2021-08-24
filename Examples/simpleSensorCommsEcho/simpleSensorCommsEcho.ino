@@ -1,6 +1,6 @@
 /**
  * @file simpleSensorCommsEcho.ino
- * @author your name (you@domain.com)
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
  * @brief Demonstrates communicating locally with a sensor, echoing communication from the hardware serial port to the USB serial and vice/versa. Based on SerialPassthrough sketch.
  * @version 0.1
  * @date 2021-06

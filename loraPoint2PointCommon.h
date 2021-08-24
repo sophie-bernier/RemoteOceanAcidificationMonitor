@@ -1,7 +1,7 @@
 /**
  * @file loraPoint2PointCommon.h
- * @author your name (you@domain.com)
- * @brief Functions common to standard and lightweight loraPoint2PointProtoocl
+ * @author Sophie Bernier (sophie.liz.ber@gmail.com)
+ * @brief Functions common to standard and lightweight loraPoint2PointProtocol
  * @version 0.1
  * @date 2021-07-20
  * 

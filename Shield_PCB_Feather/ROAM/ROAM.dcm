@@ -1,0 +1,15 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP 22uF,25V
+D CAP CER 22UF 25V X7R 1210
+K cap capacitor
+F https://search.murata.co.jp/Ceramy/image/img/A01X/G101/ENG/GRM32ER71E226ME15-01.pdf
+$ENDCMP
+#
+$CMP K7803-500R3
+D ~3.3V buck converter with wide input voltage.
+K buck
+F https://www.mornsun-power.com/html/pdf/K7803-500R3.html
+$ENDCMP
+#
+#End Doc Library

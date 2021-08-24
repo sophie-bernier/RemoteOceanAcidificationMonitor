@@ -1,0 +1,4 @@
+(sym_lib_table
+  (lib (name MCU_Module_Adafruit)(type Legacy)(uri ${KIPRJMOD}/MCU_Module_Adafruit/MCU_Module_Adafruit.lib)(options "")(descr ""))
+  (lib (name ROAM)(type Legacy)(uri ${KIPRJMOD}/ROAM/ROAM.lib)(options "")(descr ""))
+)

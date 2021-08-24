@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name "Remote Ocean Acidification Monitor")(type KiCad)(uri "${KIPRJMOD}/ROAM/Remote Ocean Acidification Monitor.pretty")(options "")(descr ""))
+  (lib (name MCU_Module_Adafruit)(type KiCad)(uri ${KIPRJMOD}/MCU_Module_Adafruit.pretty)(options "")(descr ""))
+)

@@ -84,6 +84,12 @@
 #define ENABLE_ACK false
 
 /**
+ * @brief Start the USB serial on startup and blocks until connection is achieved.
+ * 
+ */
+#define ENABLE_USB_SERIAL true
+
+/**
  * @brief Pin description number for PIO_SERCOM RX pin, set here to arduino pin 11 (D11).
  * 
  * Follow the example from variant.h.
@@ -289,11 +295,14 @@ void setup()
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
+  #if (ENABLE_USB_SERIAL > 0)
   Serial.begin(USB_SERIAL_BAUD);
   while (!Serial)
   {
     delay(1);
   }
+  #endif // ENABLE_USB_SERIAL
+
   SEAPHOX_SERIAL.begin(SEAPHOX_SERIAL_BAUD);
   while (!SEAPHOX_SERIAL)
   {
@@ -308,7 +317,7 @@ void setup()
   pinPeripheral(PIN_SERIAL2_RX, PIO_SERCOM);
   delay(100);
 
-  Serial.println("Feather LoRa Echo Test - Endpoint!");
+  Serial.println("Feather LoRa Echo Test - Endpoint");
 
   // manual reset
   digitalWrite(RFM95_RST, LOW);

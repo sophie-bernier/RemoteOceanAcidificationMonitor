@@ -206,7 +206,7 @@ void setup()
 
   delay(100);
 
-  Serial.println("Feather LoRa Echo Test - Base!");
+  Serial.println("Feather LoRa Echo Test - Base");
 
   // manual reset
   digitalWrite(RFM95_RST, LOW);

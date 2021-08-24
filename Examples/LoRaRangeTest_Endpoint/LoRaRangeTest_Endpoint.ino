@@ -78,6 +78,7 @@ void setup()
   {
     delay(1);
   }
+  Serial.println("LoRa Range Test - Endpoint");
   
   digitalWrite(10, HIGH); // tie SD high
   point2point.setupRadio();

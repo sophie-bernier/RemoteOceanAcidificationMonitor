@@ -50,7 +50,6 @@
  * Data is logged in .csv format.
  */
 
-
 #include <SPI.h>
 #include <Wire.h> 
 #include <SD.h>
@@ -59,6 +58,12 @@
 #include <RH_RF95.h>
 #include <RHReliableDatagram.h>
 #include <loraPoint2PointProtocol.h>
+
+/**
+ * @brief Start the USB serial on startup and blocks until connection is achieved.
+ * 
+ */
+#define ENABLE_USB_SERIAL true
 
 #define BUTTON_A 9
 #define BUTTON_B 6
@@ -130,12 +135,14 @@ void processButtons ();
 
 void setup()
 {
+  #if (ENABLE_USB_SERIAL > 0)
   Serial.begin(USB_SERIAL_BAUD);
   while (!Serial)
   {
     delay(1);
   }
-  Serial.println("Hello World!");
+  #endif // ENABLE_USB_SERIAL
+  Serial.println("LoRa Range Test - Base");
   
   digitalWrite(SD_CS, HIGH); // tie SD high
   digitalWrite(RFM95_CS, HIGH); // tie radio high

@@ -89,6 +89,8 @@
  */
 #define ENABLE_USB_SERIAL true
 
+#define NUM_UART_BUFFERS 2
+
 /**
  * @brief Pin description number for PIO_SERCOM RX pin, set here to arduino pin 11 (D11).
  * 
@@ -251,10 +253,14 @@ Uart Serial2(&sercom1,
 #endif // DEBUG_ENABLE_DSSS
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
-uint8_t seaphoxBuf[RH_RF95_MAX_MESSAGE_LEN];
-uint8_t seaphoxBufIdx = 1;
-uint8_t procvBuf[RH_RF95_MAX_MESSAGE_LEN];
-uint8_t procvBufIdx = 1;
+uint8_t seaphoxBuf[RH_RF95_MAX_MESSAGE_LEN][NUM_UART_BUFFERS];
+uint8_t seaphoxBufIdx[NUM_UART_BUFFERS] = {1,1};
+uint8_t seaphoxActiveBuf = 0;
+uint8_t seaphoxDoneBuf = 0xFF;
+uint8_t procvBuf[RH_RF95_MAX_MESSAGE_LEN][NUM_UART_BUFFERS];
+uint8_t procvBufIdx[NUM_UART_BUFFERS] = {1,1};
+uint8_t procvActiveBuf = 0;
+uint8_t procvDoneBuf = 0xFF;
 uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
 uint32_t outputBufCksum = 0;
@@ -269,18 +275,7 @@ bool procvDone = true;
 bool seaphoxDone = true;
 bool ledOn = false;
 
-/**
- * @brief forwardUartToRadio
- * 
- * Control characters:
- * 
- * @param hwSerial 
- * @param inputBuffer 
- * @param inputBufIdx 
- * @param inputBufDone 
- * @param sensor 
- */
-void forwardUartToRadio (Uart & hwSerial, uint8_t * & inputBuffer, uint8_t & inputBufIdx, bool & inputBufDone, sensors_t sensor);
+void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], uint8_t inputBufIdx[], uint8_t & activeInputBuf, uint8_t & doneInputBuf, sensors_t sensor);
 
 /**
  * @brief setup function
@@ -378,8 +373,8 @@ void loop() {
   #endif // DEBUG_ENABLE_DSSS
   
   // Transmit a string!
-  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxDone, sensor_seapHOx);
-  forwardUartToRadio(PROCV_SERIAL, procvBuf, procvBufIdx, procvDone, sensor_proCV);
+  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxActiveBuf, procvDoneBuf, sensor_seapHOx);
+  forwardUartToRadio(PROCV_SERIAL, procvBuf, procvBufIdx, procvActiveBuf, procvDoneBuf, sensor_proCV);
   /*
   digitalWrite(16, HIGH);
   */
@@ -455,17 +450,13 @@ void loop() {
   */    
 }
 
-void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBufIdx, bool & inputBufDone, sensors_t sensor)
+void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], uint8_t inputBufIdx[], uint8_t & activeInputBuf, uint8_t & doneInputBuf, sensors_t sensor)
 {
   uint8_t inputChar;
   /*
   digitalWrite(14, HIGH);
   */
-  if (hwSerial.available())
-  {
-    inputBufDone = false;
-  }
-  while(inputBufDone == false && hwSerial.available())
+  while(hwSerial.available() && doneInputBuf == 0xFF)
   {
     inputChar = hwSerial.read();
     switch (inputChar)
@@ -473,60 +464,66 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t * inputBuf, uint8_t & inputBuf
       case '\n': // terminate and exit
       case '\r':
         Serial.print(char(inputChar));
-        inputBufDone = true;
+        doneInputBuf = activeInputBuf;
+        activeInputBuf = (activeInputBuf > 0) ? 0 : 1;
       case ' ': // ignore
       case '*':
         break;
       default:
         Serial.print(char(inputChar));
-        inputBuf[inputBufIdx] = inputChar;
+        inputBuf[inputBufIdx[activeInputBuf]][activeInputBuf] = inputChar;
         inputBufCksum += (uint32_t)(inputChar);
-        inputBufIdx++;
+        inputBufIdx[activeInputBuf]++;
     }
   }
   /*
   digitalWrite(14, LOW);
   digitalWrite(15, HIGH);
   */
-  if (inputBufIdx > 1 
-      && inputBufDone == true)
+  if (doneInputBuf != 0xFF)
   {
-    Serial.print(": TX ");
-    if (sensor == sensor_seapHOx)
+    if (inputBufIdx[doneInputBuf] > 1)
     {
-      inputBuf[0] = msgType_seaphoxDataRsp;
+      Serial.print(": TX ");
+      if (sensor == sensor_seapHOx)
+      {
+        inputBuf[0][doneInputBuf] = msgType_seaphoxDataRsp;
+      }
+      else if (sensor == sensor_proCV)
+      {
+        inputBuf[0][doneInputBuf] = msgType_procvDataRsp;
+      }
+      else
+      {
+        inputBuf[0][doneInputBuf] = msgType_dataRsp;
+      }
+      Serial.print(msgTypeNames[inputBuf[0][doneInputBuf]]);
+      Serial.print(" (type #");
+      Serial.print(inputBuf[0][doneInputBuf], DEC);
+      Serial.print(") from");
+      if (sensor == sensor_seapHOx)
+      {
+        Serial.print(" seaphox");
+      }
+      else if (sensor == sensor_proCV)
+      {
+        Serial.print(" procv");
+      }
+      else
+      {
+        Serial.print(" other");
+      }
+      Serial.print(" buffer ");
+      Serial.print(doneInputBuf);
+      rf95.waitCAD();
+      rf95.send(inputBuf[doneInputBuf], inputBufIdx[doneInputBuf]);
+      rf95.waitPacketSent();
+      Serial.print(" sent, ");
+      Serial.print("inputBufCksum = ");
+      Serial.println(inputBufCksum);
+      inputBufIdx[doneInputBuf] = 1;
     }
-    else if (sensor == sensor_proCV)
-    {
-      inputBuf[0] = msgType_procvDataRsp;
-    }
-    else
-    {
-      inputBuf[0] = msgType_dataRsp;
-    }
-    Serial.print(msgTypeNames[inputBuf[0]]);
-    Serial.print(" (type #");
-    Serial.print(inputBuf[0], DEC);
-    Serial.print(") from");
-    if (sensor == sensor_seapHOx)
-    {
-      Serial.print(" seaphox");
-    }
-    else if (sensor == sensor_proCV)
-    {
-      Serial.print(" procv");
-    }
-    else
-    {
-      Serial.print(" other");
-    }
-    rf95.waitCAD();
-    rf95.send(inputBuf, inputBufIdx);
-    inputBufIdx = 1;
-    rf95.waitPacketSent();
-    Serial.println(" sent");
-    Serial.print("inputBufCksum = ");
-    Serial.println(inputBufCksum);
+    doneInputBuf = 0xFF;
   }
   /*
   digitalWrite(15, LOW);

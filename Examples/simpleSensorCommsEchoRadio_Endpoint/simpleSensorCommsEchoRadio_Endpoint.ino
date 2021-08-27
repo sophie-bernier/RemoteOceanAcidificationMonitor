@@ -349,14 +349,17 @@ void setup()
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
   // you can set transmitter powers from 5 to 23 dBm:
   rf95.setTxPower(RFM95_TX_POWER, false);
-  /*
+  
   pinMode(14, OUTPUT);
   pinMode(15, OUTPUT);
   pinMode(16, OUTPUT);
+  pinMode(17, OUTPUT);
+  pinMode(18, OUTPUT);
   digitalWrite(14, LOW);
   digitalWrite(15, LOW);
   digitalWrite(16, LOW);
-  */
+  digitalWrite(17, LOW);
+  digitalWrite(18, LOW);
 }
 
 void loop() {
@@ -373,11 +376,11 @@ void loop() {
   #endif // DEBUG_ENABLE_DSSS
   
   // Transmit a string!
-  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxActiveBuf, procvDoneBuf, sensor_seapHOx);
+  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxActiveBuf, seaphoxDoneBuf, sensor_seapHOx);
   forwardUartToRadio(PROCV_SERIAL, procvBuf, procvBufIdx, procvActiveBuf, procvDoneBuf, sensor_proCV);
-  /*
+  
   digitalWrite(16, HIGH);
-  */
+  
   if (rf95.recv(outputBuf, &outputBufLen))
   {
     Serial.println();
@@ -445,19 +448,29 @@ void loop() {
     }
     #endif // ENABLE_ACK
   }
-  /*
+  
   digitalWrite(16, LOW);
-  */    
+  
 }
 
 void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], uint8_t inputBufIdx[], uint8_t & activeInputBuf, uint8_t & doneInputBuf, sensors_t sensor)
 {
   uint8_t inputChar;
-  /*
-  digitalWrite(14, HIGH);
-  */
+
+  if (activeInputBuf != 0)
+  {
+    digitalWrite(18, HIGH);
+  }
+  else
+  {
+    digitalWrite(18, LOW);
+  }
+
+  digitalWrite(18, LOW);
+
   while(hwSerial.available() && doneInputBuf == 0xFF)
   {
+    digitalWrite(14, HIGH);
     inputChar = hwSerial.read();
     switch (inputChar)
     {
@@ -465,23 +478,31 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], 
       case '\r':
         Serial.print(char(inputChar));
         doneInputBuf = activeInputBuf;
-        activeInputBuf = (activeInputBuf > 0) ? 0 : 1;
+        if (activeInputBuf != 0)
+        {
+          activeInputBuf = 0;
+        }
+        else
+        {
+          activeInputBuf = 1;
+        }
       case ' ': // ignore
       case '*':
         break;
       default:
+        digitalWrite(17, HIGH);
         Serial.print(char(inputChar));
         inputBuf[inputBufIdx[activeInputBuf]][activeInputBuf] = inputChar;
         inputBufCksum += (uint32_t)(inputChar);
         inputBufIdx[activeInputBuf]++;
+        digitalWrite(17, LOW);
     }
+    digitalWrite(14, LOW);
   }
-  /*
-  digitalWrite(14, LOW);
-  digitalWrite(15, HIGH);
-  */
+
   if (doneInputBuf != 0xFF)
   {
+    digitalWrite(15, HIGH);
     if (inputBufIdx[doneInputBuf] > 1)
     {
       Serial.print(": TX ");
@@ -524,10 +545,8 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], 
       inputBufIdx[doneInputBuf] = 1;
     }
     doneInputBuf = 0xFF;
+    digitalWrite(15, LOW);
   }
-  /*
-  digitalWrite(15, LOW);
-  */
 }
 
 void SERCOM1_Handler() // Interrupt handler for SERCOM1

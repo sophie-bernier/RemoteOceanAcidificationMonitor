@@ -253,14 +253,24 @@ Uart Serial2(&sercom1,
 #endif // DEBUG_ENABLE_DSSS
 
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
-uint8_t seaphoxBuf[RH_RF95_MAX_MESSAGE_LEN][NUM_UART_BUFFERS];
-uint8_t seaphoxBufIdx[NUM_UART_BUFFERS] = {1,1};
-uint8_t seaphoxActiveBuf = 0;
-uint8_t seaphoxDoneBuf = 0xFF;
-uint8_t procvBuf[RH_RF95_MAX_MESSAGE_LEN][NUM_UART_BUFFERS];
-uint8_t procvBufIdx[NUM_UART_BUFFERS] = {1,1};
-uint8_t procvActiveBuf = 0;
-uint8_t procvDoneBuf = 0xFF;
+
+struct sensorBuf
+{
+  uint8_t arr[RH_RF95_MAX_MESSAGE_LEN];
+  uint8_t len = 1;
+};
+
+struct sensorBufs
+{
+  sensorBuf buf0;
+  sensorBuf buf1;
+  sensorBuf * bufArr[NUM_UART_BUFFERS] = {&buf0, &buf1};
+  uint8_t activeIdx = 0;
+  sensorBuf * active = bufArr[0];
+  uint8_t doneIdx = 0;
+  sensorBuf * done = NULL;
+} seaphoxBuf, procvBuf;
+
 uint8_t outputBuf[RH_RF95_MAX_MESSAGE_LEN];
 uint8_t outputBufLen = RH_RF95_MAX_MESSAGE_LEN;
 uint32_t outputBufCksum = 0;
@@ -275,7 +285,9 @@ bool procvDone = true;
 bool seaphoxDone = true;
 bool ledOn = false;
 
-void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], uint8_t inputBufIdx[], uint8_t & activeInputBuf, uint8_t & doneInputBuf, sensors_t sensor);
+void forwardUartToRadio (Uart & hwSerial, 
+                         sensorBufs & inputBuf,
+                         sensors_t sensor);
 
 /**
  * @brief setup function
@@ -376,8 +388,9 @@ void loop() {
   #endif // DEBUG_ENABLE_DSSS
   
   // Transmit a string!
-  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, seaphoxBufIdx, seaphoxActiveBuf, seaphoxDoneBuf, sensor_seapHOx);
-  forwardUartToRadio(PROCV_SERIAL, procvBuf, procvBufIdx, procvActiveBuf, procvDoneBuf, sensor_proCV);
+  
+  forwardUartToRadio(SEAPHOX_SERIAL, seaphoxBuf, sensor_seapHOx);
+  forwardUartToRadio(PROCV_SERIAL, procvBuf, sensor_proCV);
   
   digitalWrite(16, HIGH);
   
@@ -453,11 +466,13 @@ void loop() {
   
 }
 
-void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], uint8_t inputBufIdx[], uint8_t & activeInputBuf, uint8_t & doneInputBuf, sensors_t sensor)
+void forwardUartToRadio (Uart & hwSerial, 
+                         sensorBufs & inputBuf,
+                         sensors_t sensor)
 {
   uint8_t inputChar;
 
-  if (activeInputBuf != 0)
+  if (inputBuf.activeIdx == 0)
   {
     digitalWrite(18, HIGH);
   }
@@ -468,7 +483,7 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], 
 
   digitalWrite(18, LOW);
 
-  while(hwSerial.available() && doneInputBuf == 0xFF)
+  while(hwSerial.available() && (inputBuf.done == NULL))
   {
     digitalWrite(14, HIGH);
     inputChar = hwSerial.read();
@@ -477,50 +492,63 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], 
       case '\n': // terminate and exit
       case '\r':
         Serial.print(char(inputChar));
-        doneInputBuf = activeInputBuf;
-        if (activeInputBuf != 0)
+        inputBuf.done = inputBuf.active;
+        inputBuf.doneIdx = inputBuf.activeIdx;
+        if (inputBuf.activeIdx != 0)
         {
-          activeInputBuf = 0;
+          inputBuf.activeIdx = 0;
         }
         else
         {
-          activeInputBuf = 1;
+          inputBuf.activeIdx = 1;
         }
+        inputBuf.active = inputBuf.bufArr[inputBuf.activeIdx];
       case ' ': // ignore
       case '*':
         break;
       default:
         digitalWrite(17, HIGH);
         Serial.print(char(inputChar));
-        inputBuf[inputBufIdx[activeInputBuf]][activeInputBuf] = inputChar;
+        inputBuf.active->arr[inputBuf.active->len] = inputChar;
         inputBufCksum += (uint32_t)(inputChar);
-        inputBufIdx[activeInputBuf]++;
+        inputBuf.active->len++;
         digitalWrite(17, LOW);
     }
     digitalWrite(14, LOW);
+    Serial.print(" buf ");
+    Serial.print(inputBuf.activeIdx);
+    Serial.print(" len0 ");
+    Serial.print(inputBuf.bufArr[0]->len);
+    Serial.print(" len1 ");
+    Serial.print(inputBuf.bufArr[1]->len);
+    Serial.println();
   }
 
-  if (doneInputBuf != 0xFF)
+  if (inputBuf.done != NULL)
   {
     digitalWrite(15, HIGH);
-    if (inputBufIdx[doneInputBuf] > 1)
+    if (inputBuf.done->len > 1)
     {
+      for (uint8_t i = 1; i < inputBuf.done->len; i++)
+      {
+        Serial.print((char)(inputBuf.done->arr[i]));
+      }
       Serial.print(": TX ");
       if (sensor == sensor_seapHOx)
       {
-        inputBuf[0][doneInputBuf] = msgType_seaphoxDataRsp;
+        inputBuf.done->arr[0] = msgType_seaphoxDataRsp;
       }
       else if (sensor == sensor_proCV)
       {
-        inputBuf[0][doneInputBuf] = msgType_procvDataRsp;
+        inputBuf.done->arr[0] = msgType_procvDataRsp;
       }
       else
       {
-        inputBuf[0][doneInputBuf] = msgType_dataRsp;
+        inputBuf.done->arr[0] = msgType_dataRsp;
       }
-      Serial.print(msgTypeNames[inputBuf[0][doneInputBuf]]);
+      Serial.print(msgTypeNames[inputBuf.done->arr[0]]);
       Serial.print(" (type #");
-      Serial.print(inputBuf[0][doneInputBuf], DEC);
+      Serial.print(inputBuf.done->arr[0], DEC);
       Serial.print(") from");
       if (sensor == sensor_seapHOx)
       {
@@ -534,17 +562,19 @@ void forwardUartToRadio (Uart & hwSerial, uint8_t inputBuf[][NUM_UART_BUFFERS], 
       {
         Serial.print(" other");
       }
-      Serial.print(" buffer ");
-      Serial.print(doneInputBuf);
+      Serial.print(" buf ");
+      Serial.print(inputBuf.doneIdx);
+      Serial.print(" len ");
+      Serial.print(inputBuf.done->len);
       rf95.waitCAD();
-      rf95.send(inputBuf[doneInputBuf], inputBufIdx[doneInputBuf]);
+      rf95.send(inputBuf.done->arr, inputBuf.done->len);
       rf95.waitPacketSent();
       Serial.print(" sent, ");
       Serial.print("inputBufCksum = ");
       Serial.println(inputBufCksum);
-      inputBufIdx[doneInputBuf] = 1;
+      inputBuf.done->len = 1;
     }
-    doneInputBuf = 0xFF;
+    inputBuf.done = NULL;
     digitalWrite(15, LOW);
   }
 }

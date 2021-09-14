@@ -212,7 +212,7 @@ Uart Serial2(&sercom1,
  * @brief USB baud rate.
  * 
  */
-#define USB_SERIAL_BAUD     115200
+#define USB_SERIAL_BAUD     500000//115200
 
 /**
  * @brief SeapHOx baud rate
@@ -515,13 +515,15 @@ void forwardUartToRadio (Uart & hwSerial,
         digitalWrite(17, LOW);
     }
     digitalWrite(14, LOW);
-    Serial.print(" buf ");
+    /*
+    Serial.print(",b ");
     Serial.print(inputBuf.activeIdx);
-    Serial.print(" len0 ");
+    Serial.print(",0 ");
     Serial.print(inputBuf.bufArr[0]->len);
-    Serial.print(" len1 ");
+    Serial.print(",1 ");
     Serial.print(inputBuf.bufArr[1]->len);
     Serial.println();
+    */
   }
 
   if (inputBuf.done != NULL)
@@ -529,10 +531,12 @@ void forwardUartToRadio (Uart & hwSerial,
     digitalWrite(15, HIGH);
     if (inputBuf.done->len > 1)
     {
+      /*
       for (uint8_t i = 1; i < inputBuf.done->len; i++)
       {
         Serial.print((char)(inputBuf.done->arr[i]));
       }
+      */
       Serial.print(": TX ");
       if (sensor == sensor_seapHOx)
       {
@@ -568,7 +572,7 @@ void forwardUartToRadio (Uart & hwSerial,
       Serial.print(inputBuf.done->len);
       rf95.waitCAD();
       rf95.send(inputBuf.done->arr, inputBuf.done->len);
-      rf95.waitPacketSent();
+      // rf95.waitPacketSent();
       Serial.print(" sent, ");
       Serial.print("inputBufCksum = ");
       Serial.println(inputBufCksum);

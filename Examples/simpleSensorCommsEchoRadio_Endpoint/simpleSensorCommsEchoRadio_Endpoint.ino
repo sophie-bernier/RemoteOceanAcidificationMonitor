@@ -432,7 +432,7 @@ void loop() {
         Serial.println("Starting hopping.");
         rspBuf[0] = msgType_dataRsp;
         rf95.send(rspBuf, rspBufLen);
-        rf95.waitPacketSent();
+        // rf95.waitPacketSent();
         rf95.advanceFrequencySequence(true, FREQ_CHANGE_INTERVAL_MS);
         break;
         #endif // DEBUG_ENABLE_DSSS
@@ -491,28 +491,31 @@ void forwardUartToRadio (Uart & hwSerial,
     {
       case '\n': // terminate and exit
       case '\r':
-        Serial.print(char(inputChar));
-        inputBuf.done = inputBuf.active;
-        inputBuf.doneIdx = inputBuf.activeIdx;
-        if (inputBuf.activeIdx != 0)
+        if (inputBuf.active->len > 1)
         {
-          inputBuf.activeIdx = 0;
+          Serial.print(char(inputChar));
+          inputBuf.done = inputBuf.active;
+          inputBuf.doneIdx = inputBuf.activeIdx;
+          if (inputBuf.activeIdx != 0)
+          {
+            inputBuf.activeIdx = 0;
+          }
+          else
+          {
+            inputBuf.activeIdx = 1;
+          }
+          inputBuf.active = inputBuf.bufArr[inputBuf.activeIdx];
         }
-        else
-        {
-          inputBuf.activeIdx = 1;
-        }
-        inputBuf.active = inputBuf.bufArr[inputBuf.activeIdx];
       case ' ': // ignore
       case '*':
         break;
       default:
-        digitalWrite(17, HIGH);
+        //digitalWrite(17, HIGH);
         Serial.print(char(inputChar));
         inputBuf.active->arr[inputBuf.active->len] = inputChar;
         inputBufCksum += (uint32_t)(inputChar);
         inputBuf.active->len++;
-        digitalWrite(17, LOW);
+        //digitalWrite(17, LOW);
     }
     digitalWrite(14, LOW);
     /*
@@ -529,8 +532,6 @@ void forwardUartToRadio (Uart & hwSerial,
   if (inputBuf.done != NULL)
   {
     digitalWrite(15, HIGH);
-    if (inputBuf.done->len > 1)
-    {
       /*
       for (uint8_t i = 1; i < inputBuf.done->len; i++)
       {
@@ -577,7 +578,6 @@ void forwardUartToRadio (Uart & hwSerial,
       Serial.print("inputBufCksum = ");
       Serial.println(inputBufCksum);
       inputBuf.done->len = 1;
-    }
     inputBuf.done = NULL;
     digitalWrite(15, LOW);
   }
